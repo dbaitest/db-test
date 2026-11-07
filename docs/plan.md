@@ -83,8 +83,26 @@ and the next run is exactly when you want to see it.
   executed against all three engines.
 
 **Verification: 24/24 tests pass in Release from a clean tree**, on Windows with Docker
-Desktop 29.7.2 and .NET SDK 10.0.301, targeting `net8.0`. The suite is 18 integration tests
-(6 behaviour tests × 3 engines) plus 6 statement-splitter unit tests.
+Desktop 29.7.2 and .NET SDK 10.0.301. The suite is 18 integration tests (6 behaviour tests ×
+3 engines) plus 6 statement-splitter unit tests.
+
+### Supported runtimes
+
+The packages target `net8.0`, `net9.0` and `net10.0`. `DbTestTargetFrameworks` in
+`Directory.Build.props` holds that list, and every project — the libraries, the CLI and
+the suite — targets all of it. A consumer on .NET 8 resolves the `net8.0` asset; a consumer
+on a newer runtime resolves the one that matches it.
+
+Two mechanisms make "net8.0 or newer" true rather than nominal:
+
+- `RollForward=Major` in the runtime configuration of the CLI and of the test host. A build
+  for .NET 8 runs on .NET 9, 10 and later when the .NET 8 runtime is not installed; without
+  it, a machine with only .NET 10 refuses to start the .NET 8 test host.
+- The CI matrix runs the behaviour suite on each runtime, and the unit tests run once per
+  target framework on every build.
+
+Building the repository needs the .NET 10 SDK, which `global.json` pins: targeting
+`net10.0` needs an SDK that new. Consuming the packages needs only .NET 8 or newer.
 
 ### Traps hit while building this, and what they teach
 

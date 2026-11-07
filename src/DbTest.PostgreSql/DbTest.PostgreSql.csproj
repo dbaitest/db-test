@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <TargetFrameworks>$(DbTestTargetFrameworks)</TargetFrameworks>
     <Description>PostgreSQL engine for DbTest: container lifecycle, dollar-quote-safe schema application and Postgres introspection.</Description>
     <IsPackable>true</IsPackable>
     <PackageId>DbTest.PostgreSql</PackageId>
