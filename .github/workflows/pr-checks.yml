@@ -16,11 +16,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check the title follows Conventional Commits
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           set -euo pipefail
-          title="$PR_TITLE"
           pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9._/-]+\))?!?: .+'
-          if ! printf '%s' "$title" | grep -Eq "$pattern"; then
+          if ! printf '%s' "$PR_TITLE" | grep -Eq "$pattern"; then
             echo "::error::The pull request title does not follow Conventional Commits."
             echo ""
             echo "  Expected: type(scope): summary"
@@ -28,14 +29,16 @@ jobs:
             echo "            fix(mysql): reset identity after truncate"
             echo "            docs: record the engine traps"
             echo ""
-            echo "  Got: $title"
+            echo "  Got: $PR_TITLE"
             exit 1
           fi
 
       - name: Check the description is filled in
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           set -euo pipefail
-          body="$PR_BODY"
+          body="${PR_BODY:-}"
           if [ ${#body} -lt 40 ]; then
             echo "::error::The pull request description is too short."
             echo "Fill in the template: what changed, why, and how it was verified."
