@@ -109,19 +109,30 @@ release and pushes every package to nuget.org.
 gh release create v0.1.0 --generate-notes
 ```
 
-The workflow needs one repository secret:
+The workflow publishes through **trusted publishing**: GitHub mints an OIDC token, nuget.org
+checks it against the policy registered for this repository and hands back a key that lives
+for one hour. There is no API key in the repository and nothing to rotate.
 
-| Secret | What it is |
+The policy on nuget.org (username → *Trusted Publishing*) is:
+
+| Field | Value |
 |---|---|
-| `NUGET_API_KEY` | A nuget.org API key with push rights for the `DbTest.*` packages. Create it on nuget.org under *Account → API keys*, then `gh secret set NUGET_API_KEY`. |
+| Repository Owner | `dbaitest` |
+| Repository | `db-test` |
+| Workflow File | `publish.yml` |
+| Environment | `production` |
 
-The push runs with `--skip-duplicate`, so re-running a half-finished publish does not fail
-on the packages that already landed. The workflow can also be triggered by hand from the
-Actions tab, which is the way to re-publish after nuget.org rejected a package.
+The environment is why the publish job declares `environment: production` — the OIDC token
+only carries that claim when the job names the environment. The environment exists in the
+repository settings and carries no protection rules, so the publish is not blocked on a
+reviewer.
 
-nuget.org also supports **trusted publishing**: the workflow asks nuget.org for a
-short-lived token instead of holding a long-lived key. It is the better option once there
-is a second maintainer who can register the publisher.
+A new policy starts in a **seven-day pending state** and becomes permanent after the first
+successful publish. If seven days pass without one, the policy goes inactive and nuget.org
+offers an *Activate for 7 days* button on the policy.
+
+If a publish fails half way, run the `Publish` workflow by hand from the `main` branch.
+The push uses `--skip-duplicate`, so the packages that already landed do not fail the run.
 
 ## Ground rules
 

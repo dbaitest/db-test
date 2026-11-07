@@ -11,6 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # Required to mint the OIDC token that nuget.org exchanges for a short-lived key.
+      id-token: write
+    # The nuget.org policy names this environment, and the OIDC token only carries the
+    # environment claim when the job names it.
+    environment: production
 
     steps:
       - uses: actions/checkout@v4
@@ -28,11 +33,40 @@ jobs:
       - name: Pack
         run: dotnet pack --configuration Release --no-restore --output artifacts
 
-      # --skip-duplicate keeps a re-run of a half-finished publish from failing on the
-      # packages that already landed.
-      - name: Push to nuget.org
+      # Trusted publishing: GitHub mints the OIDC token, nuget.org checks it against the
+      # policy registered for this repository and hands back a key that lives for one
+      # hour. Nothing long-lived is stored in the repository. The key is minted right
+      # before the push, because it expires.
+      - name: Get a short-lived nuget.org key
         env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          NUGET_USER: dbaitest
+        run: |
+          set -euo pipefail
+
+          oidc_token=$(curl --fail --silent --show-error \
+            --header "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://www.nuget.org" | jq --raw-output '.value')
+
+          # No --fail here on purpose: when the policy does not match, nuget.org answers
+          # with a JSON error that says why, and that answer is the whole diagnosis.
+          response=$(curl --silent --show-error \
+            --request POST "https://www.nuget.org/api/v2/token" \
+            --header "Content-Type: application/json" \
+            --header "Authorization: Bearer $oidc_token" \
+            --data "{\"username\": \"$NUGET_USER\", \"tokenType\": \"ApiKey\"}")
+
+          api_key=$(echo "$response" | jq --raw-output '.apiKey // empty')
+
+          if [ -z "$api_key" ]; then
+            echo "nuget.org did not issue a key. Its answer:" >&2
+            echo "$response" >&2
+            exit 1
+          fi
+
+          echo "::add-mask::$api_key"
+          echo "NUGET_API_KEY=$api_key" >> "$GITHUB_ENV"
+
+      - name: Push to nuget.org
         run: >-
           dotnet nuget push "artifacts/*.nupkg"
           --source https://api.nuget.org/v3/index.json
