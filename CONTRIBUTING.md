@@ -17,6 +17,30 @@ dotnet test --filter "FullyQualifiedName~Unit"           # no container needed, 
 dotnet test --filter "FullyQualifiedName~PostgreSql"     # one engine
 ```
 
+## Push access
+
+Forks are welcome. If you would rather push straight to this repository, ask a maintainer
+to grant you write access.
+
+Whichever route you take, the credentials are yours to manage — this repository does not
+carry anybody's keys or tokens. Two common setups:
+
+**HTTPS with the GitHub CLI** (the token is stored in your system credential store):
+
+```bash
+gh auth login
+git remote set-url origin https://github.com/dbaitest/db-test.git
+gh auth setup-git
+```
+
+**SSH**, which does not expire and needs no browser step after the key is registered:
+
+```bash
+ssh-keygen -t ed25519 -C "you@example.com"
+# add ~/.ssh/id_ed25519.pub at https://github.com/settings/ssh/new
+git remote set-url origin git@github.com:dbaitest/db-test.git
+```
+
 ## Ground rules
 
 **The engine interface is the abstraction boundary.** If a test needs to know which engine it
