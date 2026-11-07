@@ -1,0 +1,51 @@
+name: PR checks
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+# No third-party actions: the checks are small enough to keep in the repository,
+# and a pull request should not be able to run arbitrary code from an unpinned
+# dependency to find out whether it is allowed to merge.
+permissions:
+  contents: read
+
+jobs:
+  title:
+    name: PR title and description
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the title follows Conventional Commits
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9._/-]+\))?!?: .+'
+          if ! printf '%s' "$PR_TITLE" | grep -Eq "$pattern"; then
+            echo "::error::The pull request title does not follow Conventional Commits."
+            echo ""
+            echo "  Expected: type(scope): summary"
+            echo "  Examples: feat(core): add shape guard"
+            echo "            fix(mysql): reset identity after truncate"
+            echo "            docs: record the engine traps"
+            echo ""
+            echo "  Got: $PR_TITLE"
+            exit 1
+          fi
+
+      - name: Check the description is filled in
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          body="${PR_BODY:-}"
+          if [ ${#body} -lt 40 ]; then
+            echo "::error::The pull request description is too short."
+            echo "Fill in the template: what changed, why, and how it was verified."
+            exit 1
+          fi
+          if printf '%s' "$body" | grep -q '<!--'; then
+            echo "::error::The pull request description still contains template placeholders."
+            echo "Remove the HTML comments the template uses as instructions."
+            exit 1
+          fi

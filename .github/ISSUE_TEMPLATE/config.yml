@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question or discussion
+    url: https://github.com/dbaitest/db-test/discussions
+    about: Ask how to use the harness, or propose an idea without filing an issue.
