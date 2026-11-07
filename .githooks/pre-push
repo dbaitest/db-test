@@ -44,6 +44,9 @@ Then open the pull request:
 
     gh pr create --base $protected_branch --fill
 
+A pull request needs one approving review from a code owner before it merges, so
+ask the other maintainer to look at it.
+
 If this is a fork, push the branch to your fork and open the pull request from
 there instead.
 EOF
