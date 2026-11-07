@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <TargetFrameworks>$(DbTestTargetFrameworks)</TargetFrameworks>
     <Description>Command line front end for DbTest: start a container, apply a schema, report on it.</Description>
     <IsPackable>true</IsPackable>
     <PackageId>DbTest.Cli</PackageId>

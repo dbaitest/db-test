@@ -13,13 +13,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The libraries, the CLI and the suite target net8.0, net9.0 and net10.0, so the
+      # runner needs the runtime of each one. The SDK itself is pinned by global.json:
+      # targeting net10.0 needs a .NET 10 SDK.
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
 
-      # The libraries target net8.0. A newer SDK builds them, but the test host needs the
-      # matching runtime installed, so it is added explicitly.
-      - name: Install .NET 8 runtime
+      - name: Show installed runtimes
         run: dotnet --list-runtimes
 
       - name: Restore
@@ -28,6 +32,8 @@ jobs:
       - name: Build
         run: dotnet build --configuration Release --no-restore
 
+      # No filter on the framework: this runs the unit tests once per target framework,
+      # which is the cheapest proof that the code compiles and runs on all three.
       - name: Unit tests
         run: dotnet test --configuration Release --no-build --filter "FullyQualifiedName~Unit"
 
@@ -45,7 +51,10 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
 
       - name: Restore
         run: dotnet restore
@@ -53,9 +62,29 @@ jobs:
       - name: Build
         run: dotnet build --configuration Release --no-restore
 
-      - name: Integration tests
+      # One leg per supported runtime, in one job so the database image is pulled once
+      # instead of once per framework. Each leg runs on its own runtime: the net8.0 leg
+      # on .NET 8, the net9.0 leg on .NET 9, the net10.0 leg on .NET 10.
+      - name: Integration tests (net8.0)
         run: >-
           dotnet test
           --configuration Release
           --no-build
+          --framework net8.0
+          --filter "FullyQualifiedName~${{ matrix.engine }}HarnessTests"
+
+      - name: Integration tests (net9.0)
+        run: >-
+          dotnet test
+          --configuration Release
+          --no-build
+          --framework net9.0
+          --filter "FullyQualifiedName~${{ matrix.engine }}HarnessTests"
+
+      - name: Integration tests (net10.0)
+        run: >-
+          dotnet test
+          --configuration Release
+          --no-build
+          --framework net10.0
           --filter "FullyQualifiedName~${{ matrix.engine }}HarnessTests"

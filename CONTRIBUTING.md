@@ -27,19 +27,23 @@ git config core.hooksPath .githooks
 ```bash
 dotnet build
 dotnet test --filter "FullyQualifiedName~Unit"           # fast, no container
-dotnet test                                               # all three engines
+dotnet test -f net8.0                                    # all three engines, one runtime
 ```
 
 Docker must be running: the integration tests start real database containers.
+
+Everything targets `net8.0`, `net9.0` and `net10.0`, so `dotnet build` builds three times
+over and `dotnet test` runs the suite once per framework — pass `--framework` (or `-f`) to
+pick one.
 
 ## What CI checks
 
 | Check | What it enforces |
 |---|---|
-| `build` | Builds the solution and runs the unit tests |
-| `integration (MsSql)` | The full behaviour suite against SQL Server |
-| `integration (PostgreSql)` | The full behaviour suite against PostgreSQL |
-| `integration (MySql)` | The full behaviour suite against MySQL |
+| `build` | Builds the solution for every supported framework and runs the unit tests on each |
+| `integration (MsSql)` | The full behaviour suite against SQL Server, on .NET 8, 9 and 10 |
+| `integration (PostgreSql)` | The full behaviour suite against PostgreSQL, on .NET 8, 9 and 10 |
+| `integration (MySql)` | The full behaviour suite against MySQL, on .NET 8, 9 and 10 |
 | `PR title and description` | The title follows Conventional Commits; the description is filled in |
 
 All of them are required before a pull request can merge. The engine jobs run in parallel
@@ -126,7 +130,11 @@ the engine's own test class, and the shared assertion stays shared.
 
 ## Dependencies
 
-- .NET 8.0 target. The test host needs a matching runtime installed.
+- Supported runtimes: `net8.0`, `net9.0` and `net10.0`. The list lives in
+  `DbTestTargetFrameworks` in `Directory.Build.props`; every project targets all of them,
+  so a change to that list changes what CI builds and runs.
+- Building the repository needs the .NET 10 SDK — `global.json` pins it, because targeting
+  `net10.0` needs an SDK that new. Consuming the packages needs only .NET 8 or newer.
 - `Microsoft.Data.SqlClient` does **not** work under globalization invariant mode. Do not
   enable `InvariantGlobalization` in `Directory.Build.props`.
 - `MySqlConnector` must stay at 2.6.1 or later (GHSA-473q-m89c-ghf8).

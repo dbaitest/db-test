@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <TargetFrameworks>$(DbTestTargetFrameworks)</TargetFrameworks>
     <IsPackable>false</IsPackable>
     <AssemblyName>DbTest.Integration.Tests</AssemblyName>
     <RootNamespace>DbTest.Integration.Tests</RootNamespace>

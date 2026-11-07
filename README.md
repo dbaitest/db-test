@@ -69,8 +69,10 @@ dotnet tool install --global DbTest.Cli
 
 - **Docker** must be running. The harness starts real containers through
   [Testcontainers](https://github.com/testcontainers/testcontainers-dotnet).
-- **.NET 8 runtime** must be installed. The libraries target `net8.0`; a newer SDK builds
-  them but the test host needs the matching runtime.
+- **.NET 8 or newer** must be installed. The packages ship a `net8.0`, a `net9.0` and a
+  `net10.0` asset, so the runtime you have is the runtime the package was built for. The
+  CLI and the test host also roll forward: a build for .NET 8 runs on .NET 9, 10 and later
+  when the .NET 8 runtime is not installed.
 
 ## The schema
 

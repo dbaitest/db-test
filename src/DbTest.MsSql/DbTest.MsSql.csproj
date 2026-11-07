@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <TargetFrameworks>$(DbTestTargetFrameworks)</TargetFrameworks>
     <Description>SQL Server engine for DbTest: container lifecycle, GO-batch schema application and SQL Server introspection.</Description>
     <IsPackable>true</IsPackable>
     <PackageId>DbTest.MsSql</PackageId>
