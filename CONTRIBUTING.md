@@ -99,6 +99,30 @@ The rest of the protection on `main` is not optional:
 | Linear history | No merge commits. |
 | Conversations resolved | An open discussion blocks the merge. |
 
+## Releasing
+
+A release is a tag plus a GitHub release. The `Publish` workflow runs on the published
+release and pushes every package to nuget.org.
+
+```bash
+# The version in Directory.Build.props is the version that gets published.
+gh release create v0.1.0 --generate-notes
+```
+
+The workflow needs one repository secret:
+
+| Secret | What it is |
+|---|---|
+| `NUGET_API_KEY` | A nuget.org API key with push rights for the `DbTest.*` packages. Create it on nuget.org under *Account → API keys*, then `gh secret set NUGET_API_KEY`. |
+
+The push runs with `--skip-duplicate`, so re-running a half-finished publish does not fail
+on the packages that already landed. The workflow can also be triggered by hand from the
+Actions tab, which is the way to re-publish after nuget.org rejected a package.
+
+nuget.org also supports **trusted publishing**: the workflow asks nuget.org for a
+short-lived token instead of holding a long-lived key. It is the better option once there
+is a second maintainer who can register the publisher.
+
 ## Ground rules
 
 **The engine interface is the abstraction boundary.** If a test needs to know which engine it

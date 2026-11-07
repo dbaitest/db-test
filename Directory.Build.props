@@ -22,6 +22,11 @@
     <Copyright>Copyright (c) dbaitest contributors</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/dbaitest/db-test</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/dbaitest/db-test</PackageProjectUrl>
+    <PackageTags>dotnet;database;testing;integration-tests;testcontainers;sqlserver;postgresql;mysql;mstest</PackageTags>
+    <!-- The README ships inside the package, so nuget.org shows it on the package page. -->
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <VersionPrefix>0.1.0</VersionPrefix>
   </PropertyGroup>
 
