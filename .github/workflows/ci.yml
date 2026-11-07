@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      # The libraries target net8.0. A newer SDK builds them, but the test host needs the
+      # matching runtime installed, so it is added explicitly.
+      - name: Install .NET 8 runtime
+        run: dotnet --list-runtimes
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Unit tests
+        run: dotnet test --configuration Release --no-build --filter "FullyQualifiedName~Unit"
+
+  integration:
+    runs-on: ubuntu-latest
+    # The integration suite starts a container per engine. Running the three engines as
+    # separate jobs keeps one engine's failure from hiding the others' results.
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [MsSql, PostgreSql, MySql]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Integration tests
+        run: >-
+          dotnet test
+          --configuration Release
+          --no-build
+          --filter "FullyQualifiedName~${{ matrix.engine }}HarnessTests"

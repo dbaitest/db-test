@@ -1,0 +1,35 @@
+<Project>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!--
+      Globalization invariant mode is deliberately NOT enabled: Microsoft.Data.SqlClient
+      refuses to run under it ("Globalization Invariant Mode is not supported"), so the SQL
+      Server engine would fail at the first connection.
+    -->
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <NoWarn>$(NoWarn);NU1900</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Product>DbTest</Product>
+    <Authors>dbaitest</Authors>
+    <Company>dbaitest</Company>
+    <Copyright>Copyright (c) dbaitest contributors</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryType>git</RepositoryType>
+    <VersionPrefix>0.1.0</VersionPrefix>
+  </PropertyGroup>
+
+  <!--
+    net8.0 is the floor: the test host must have a matching Microsoft.NETCore.App 8.x
+    runtime installed, even when a newer SDK compiles it. The CI workflow installs it
+    explicitly for that reason.
+  -->
+
+</Project>

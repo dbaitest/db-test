@@ -1,0 +1,35 @@
+# Build output
+bin/
+obj/
+artifacts/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Test / coverage output
+TestResults/
+*.trx
+coverage*.json
+coverage*.xml
+coverage*.md
+*.coverage
+coverage*.info
+StrykerOutput/
+
+# Local environment
+.env
+.env.local
+*.local.json
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# OS
+Thumbs.db
