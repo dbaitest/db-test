@@ -47,7 +47,9 @@ jobs:
             --header "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://www.nuget.org" | jq --raw-output '.value')
 
-          response=$(curl --fail --silent --show-error \
+          # No --fail here on purpose: when the policy does not match, nuget.org answers
+          # with a JSON error that says why, and that answer is the whole diagnosis.
+          response=$(curl --silent --show-error \
             --request POST "https://www.nuget.org/api/v2/token" \
             --header "Content-Type: application/json" \
             --header "Authorization: Bearer $oidc_token" \
