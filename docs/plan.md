@@ -82,7 +82,26 @@ and the next run is exactly when you want to see it.
   seeding, cleanup with identity reset, foreign-key enforcement, and shape-guard detection,
   executed against all three engines.
 
-Verified locally on Windows with Docker Desktop 29.7.2, .NET SDK 10.0.301, net8.0 target.
+**Verification: 24/24 tests pass in Release from a clean tree**, on Windows with Docker
+Desktop 29.7.2 and .NET SDK 10.0.301, targeting `net8.0`. The suite is 18 integration tests
+(6 behaviour tests × 3 engines) plus 6 statement-splitter unit tests.
+
+### Traps hit while building this, and what they teach
+
+These are engine behaviours that cost real debugging time. Each one is now handled in the
+core, and each is worth knowing before writing another engine.
+
+| Trap | What happens | Fix |
+|---|---|---|
+| `sys.objects.type` is `char(2)` | Cast to string keeps the padding, so `"U "` never equals `"U"` and every table is classified as a routine | `RTRIM(CAST(o.type AS NVARCHAR(2)))` |
+| `pg_class.relkind` is `char` | Npgsql refuses to read a `char` column as `System.String` | `relkind::text` |
+| Routines live outside the relation catalog | `pg_class` has no procedures; `information_schema.tables` has no MySQL routines | A second query per engine (`pg_proc`, `information_schema.routines`) |
+| `DBCC CHECKIDENT` takes a quoted, comma-separated name | `DBCC CHECKIDENT ([dbo].[t]) RESEED WITH 0` is a syntax error | `DBCC CHECKIDENT ('[dbo].[t]', RESEED, 0)` |
+| SQL Server's `sa` password policy | A simple password fails the container at startup, not at first login | The MSSQL engine owns a policy-compliant default |
+| Globalization invariant mode | `Microsoft.Data.SqlClient` refuses to run under it | `InvariantGlobalization` is deliberately off, with a comment saying why |
+| `SqlDataReader.GetChar` | Not supported by SqlClient | Cast in SQL instead |
+| MySQL's `TRUNCATE` respects foreign keys | Needs `FOREIGN_KEY_CHECKS=0`, which must be in the same command as the truncates | The table list is read first, then truncated in one batch |
+
 
 ## 4. What is deliberately not built yet
 
