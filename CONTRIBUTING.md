@@ -72,10 +72,16 @@ the history: it will be the line people read in `git log`.
 The branch is deleted automatically after the merge. Discussions must be resolved, and
 reviews are dismissed when new commits land, so re-read the diff before approving.
 
-**Review requirement.** A pull request currently needs no approval to merge, because the
-repository has one maintainer and GitHub does not let you approve your own pull request —
-requiring an approval would leave nobody able to merge. When a second maintainer joins,
-raise `required_approving_review_count` to 1 on the `main` branch.
+**Review requirement.** A pull request needs one approving review from a code owner.
+GitHub does not let you approve your own pull request, so with one maintainer that
+requirement could never be satisfied — which is why `locd2o` was added as a second
+maintainer and a code owner. In practice:
+
+- A pull request from `locd2o` waits for `dbaitest` to approve it.
+- A pull request from `dbaitest` waits for `locd2o` to approve it.
+
+Either way, nobody merges their own work, and the rules apply to administrators too, so
+neither maintainer can bypass the requirement.
 
 The rest of the protection on `main` is not optional:
 
@@ -83,6 +89,7 @@ The rest of the protection on `main` is not optional:
 |---|---|
 | Pull request required | A direct push is rejected. |
 | The CI checks required | A merge waits for them, and waits again if a commit is pushed. |
+| One code owner approval | The other maintainer reviews it before it lands. |
 | Admins included | The rule applies to the maintainer too, so it cannot be bypassed. |
 | No force push, no branch deletion | History cannot be rewritten and the branch cannot be dropped. |
 | Linear history | No merge commits. |
