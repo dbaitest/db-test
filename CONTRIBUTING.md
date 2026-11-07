@@ -1,45 +1,92 @@
 # Contributing
 
-## Getting set up
+Every change to this repository goes through a pull request. Direct pushes to `main` are
+rejected by GitHub, and a local hook rejects them before they leave your machine.
+
+## The workflow
 
 ```bash
-git clone https://github.com/dbaitest/db-test.git
-cd db-test
-dotnet restore
+git switch -c feature/short-description
+# ...make your change...
+git add -A
+git commit -m "feat(core): what you changed"
+git push -u origin feature/short-description
+gh pr create --base main --fill
+```
+
+Then wait for CI, get a review, and merge.
+
+Enable the local hook once per clone so a direct push fails fast instead of at GitHub:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+## Before you open the pull request
+
+```bash
 dotnet build
+dotnet test --filter "FullyQualifiedName~Unit"           # fast, no container
+dotnet test                                               # all three engines
 ```
 
 Docker must be running: the integration tests start real database containers.
 
-```bash
-dotnet test                                              # everything
-dotnet test --filter "FullyQualifiedName~Unit"           # no container needed, fast
-dotnet test --filter "FullyQualifiedName~PostgreSql"     # one engine
+## What CI checks
+
+| Check | What it enforces |
+|---|---|
+| `build` | Builds the solution and runs the unit tests |
+| `integration (MsSql)` | The full behaviour suite against SQL Server |
+| `integration (PostgreSql)` | The full behaviour suite against PostgreSQL |
+| `integration (MySql)` | The full behaviour suite against MySQL |
+| `PR title and description` | The title follows Conventional Commits; the description is filled in |
+
+All of them are required before a pull request can merge. The engine jobs run in parallel
+and report separately, so a failure in one engine does not hide the others.
+
+## Writing the pull request
+
+The title must follow Conventional Commits:
+
+```
+type(scope): summary
 ```
 
-## Push access
+`feat` `fix` `docs` `style` `refactor` `perf` `test` `build` `ci` `chore` `revert`
 
-Forks are welcome. If you would rather push straight to this repository, ask a maintainer
-to grant you write access.
-
-Whichever route you take, the credentials are yours to manage — this repository does not
-carry anybody's keys or tokens. Two common setups:
-
-**HTTPS with the GitHub CLI** (the token is stored in your system credential store):
-
-```bash
-gh auth login
-git remote set-url origin https://github.com/dbaitest/db-test.git
-gh auth setup-git
+```
+feat(core): add a shape guard for dropped tables
+fix(mysql): reset identity counters after truncate
+docs: record the engine traps
 ```
 
-**SSH**, which does not expire and needs no browser step after the key is registered:
+The description follows the template: what changed, why, and **how it was verified**. Name
+the command you ran and what you saw — "tests pass" is not evidence.
 
-```bash
-ssh-keygen -t ed25519 -C "you@example.com"
-# add ~/.ssh/id_ed25519.pub at https://github.com/settings/ssh/new
-git remote set-url origin git@github.com:dbaitest/db-test.git
-```
+## Merge policy
+
+Squash merge only. The commit message comes from the pull request title, so write it for
+the history: it will be the line people read in `git log`.
+
+The branch is deleted automatically after the merge. Discussions must be resolved, and
+reviews are dismissed when new commits land, so re-read the diff before approving.
+
+**Review requirement.** A pull request currently needs no approval to merge, because the
+repository has one maintainer and GitHub does not let you approve your own pull request —
+requiring an approval would leave nobody able to merge. When a second maintainer joins,
+raise `required_approving_review_count` to 1 on the `main` branch.
+
+The rest of the protection on `main` is not optional:
+
+| Rule | Effect |
+|---|---|
+| Pull request required | A direct push is rejected. |
+| The CI checks required | A merge waits for them, and waits again if a commit is pushed. |
+| Admins included | The rule applies to the maintainer too, so it cannot be bypassed. |
+| No force push, no branch deletion | History cannot be rewritten and the branch cannot be dropped. |
+| Linear history | No merge commits. |
+| Conversations resolved | An open discussion blocks the merge. |
 
 ## Ground rules
 
@@ -82,3 +129,27 @@ the engine's own test class, and the shared assertion stays shared.
 ## Commits
 
 Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`, `test:`).
+
+## Push access
+
+Forks are welcome. If you would rather push straight to this repository, ask a maintainer
+to grant you write access.
+
+Whichever route you take, the credentials are yours to manage — this repository does not
+carry anybody's keys or tokens. Two common setups:
+
+**HTTPS with the GitHub CLI** (the token is stored in your system credential store):
+
+```bash
+gh auth login
+git remote set-url origin https://github.com/dbaitest/db-test.git
+gh auth setup-git
+```
+
+**SSH**, which does not expire and needs no browser step after the key is registered:
+
+```bash
+ssh-keygen -t ed25519 -C "you@example.com"
+# add ~/.ssh/id_ed25519.pub at https://github.com/settings/ssh/new
+git remote set-url origin git@github.com:dbaitest/db-test.git
+```
