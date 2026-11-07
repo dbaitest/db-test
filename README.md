@@ -184,6 +184,11 @@ Implement `IDbEngine`. Six members: start a container, apply schema, list object
 execute a statement, run a query. Everything else — schema discovery, ordering, exclusion,
 the shape guard — lives in the core and is shared.
 
+## Contributing
+
+Every change goes through a pull request. See [CONTRIBUTING.md](CONTRIBUTING.md) for the
+workflow, the checks that run, and the merge policy.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
