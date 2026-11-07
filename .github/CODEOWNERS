@@ -1,10 +1,11 @@
 # Everyone who touches this repository is expected to go through a pull request.
-# The owner is asked for review on every change, which is what makes the review
-# requirement below meaningful.
+# A merge needs one approving review from a code owner, and GitHub does not let
+# you approve your own pull request. Listing both maintainers here is what makes
+# that requirement workable: each one reviews the other's work.
 
-*                       @dbaitest
+*                       @dbaitest @locd2o
 
 # The harness is the part whose behaviour other projects depend on, so a change
 # here is worth an extra pair of eyes.
-src/DbTest.Core/        @dbaitest
-.github/                @dbaitest
+src/DbTest.Core/        @dbaitest @locd2o
+.github/                @dbaitest @locd2o
