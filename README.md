@@ -72,6 +72,29 @@ dotnet tool install --global DbTest.Cli
 - **.NET 8 runtime** must be installed. The libraries target `net8.0`; a newer SDK builds
   them but the test host needs the matching runtime.
 
+## GitHub access (one-time)
+
+Pushing over SSH avoids token expiry and repeated browser authorization.
+
+```bash
+# 1. Once, in the browser: add the public key to the dbaitest account
+#    https://github.com/settings/ssh/new
+#    Title: db-test (id_ed25519_github)
+#    Key:  the contents of ~/.ssh/id_ed25519_github.pub
+
+# 2. Wire up git and verify
+bash scripts/setup-github-ssh.sh
+```
+
+The script writes the `github.com` block into `~/.ssh/config`, points `origin` at
+`git@github.com:dbaitest/db-test.git`, verifies the connection and pushes. It is idempotent.
+
+To generate the key if you do not have it:
+
+```bash
+ssh-keygen -t ed25519 -C "dbaitest@db-test" -f ~/.ssh/id_ed25519_github -N ""
+```
+
 ## The schema
 
 Point the harness at a directory of SQL files:
