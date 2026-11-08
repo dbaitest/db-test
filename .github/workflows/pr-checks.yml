@@ -33,7 +33,11 @@ jobs:
             exit 1
           fi
 
+      # Dependabot writes its own description: the upstream release notes, which routinely
+      # contain HTML comments and say nothing about how the bump was verified (CI does that).
+      # Its titles still go through the Conventional Commits check above (build(deps), ci(deps)).
       - name: Check the description is filled in
+        if: github.event.pull_request.user.login != 'dependabot[bot]'
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
