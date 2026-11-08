@@ -7,6 +7,15 @@ may break the API, and the breaking changes are listed first.
 
 ## [Unreleased]
 
+### Added
+
+- `samples/MsSqlDacpac` tests application code: `Sample.Shop` holds an ADO.NET and a Dapper
+  repository, which run unchanged against the container through a connection factory built
+  from `Harness.ConnectionString`. The tests seed from SQL scripts and JSON data files, check
+  through the harness as well as the repository, and show rollback isolation with an
+  uncompleted `TransactionScope`.
+  Dapper is pinned for the sample only; no package depends on it.
+
 ### Changed
 
 - The package project URL points to the documentation site, https://dbaitest.com/db-test/,

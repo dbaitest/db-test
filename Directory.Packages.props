@@ -34,6 +34,9 @@
 
     <!-- The master database model, referenced by the sample database project (samples/ only). -->
     <PackageVersion Include="Microsoft.SqlServer.Dacpacs.Master" Version="160.2.8" />
+
+    <!-- Dapper, used by the sample data-access library (samples/ only): no package depends on it. -->
+    <PackageVersion Include="Dapper" Version="2.1.89" />
   </ItemGroup>
 
   <!--

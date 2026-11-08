@@ -21,6 +21,11 @@
     <ProjectReference Include="..\..\..\src\DbTest.MsSql.Dacpac\DbTest.MsSql.Dacpac.csproj" />
   </ItemGroup>
 
+  <!-- The application code under test: repositories that know nothing about DbTest. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Sample.Shop\Sample.Shop.csproj" />
+  </ItemGroup>
+
   <!--
     The database project. Referencing it makes `dotnet build` / `dotnet test` build the .dacpac
     first; it is not an assembly, so nothing is referenced or copied by the reference itself.
@@ -55,6 +60,11 @@
     <None Include="..\Sample.Database\Script.PostDeployment.sql"
           Link="Script.PostDeployment.sql"
           CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Test data: SQL scripts and JSON data files loaded by Fixtures/ShopFixtures.cs. -->
+  <ItemGroup>
+    <None Include="Fixtures\*.sql;Fixtures\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
