@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.Build.Sql">
+
+  <!--
+    A SQL Server database project (SDK-style). `dotnet build` turns it into
+    bin/<Configuration>/Sample.Database.dacpac, which the test project deploys into a throwaway
+    container. The SDK version is pinned in the repository's global.json (msbuild-sdks).
+  -->
+  <PropertyGroup>
+    <Name>Sample.Database</Name>
+    <DSP>Microsoft.Data.Tools.Schema.Sql.Sql160DatabaseSchemaProvider</DSP>
+    <ModelCollation>1033, CI</ModelCollation>
+    <!-- A sample: never packed, whatever builds it. -->
+    <IsPackable>false</IsPackable>
+    <!-- No build-time usage telemetry from the SDK. -->
+    <DacFxTelemetryEnabled>false</DacFxTelemetryEnabled>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PostDeploy Include="Script.PostDeployment.sql" />
+  </ItemGroup>
+
+  <!--
+    The master database model, so objects can use sys.* views. Most real projects carry this
+    reference, and it is why the tests copy every .dacpac from this project's output, not only
+    Sample.Database.dacpac: DacFx resolves master.dacpac next to the dacpac it deploys.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SqlServer.Dacpacs.Master" />
+  </ItemGroup>
+
+</Project>
