@@ -7,15 +7,6 @@
     <PackageTags>$(PackageTags);dacpac;dacfx;ssdt;sqlproj</PackageTags>
   </PropertyGroup>
 
-  <!--
-    Package validation compares the API against the baseline release on nuget.org, and this
-    package has no release yet. Remove this property once the first version is published so
-    the baseline check covers it like every other package.
-  -->
-  <PropertyGroup>
-    <DisablePackageBaselineValidation>true</DisablePackageBaselineValidation>
-  </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="Microsoft.SqlServer.DacFx" />
   </ItemGroup>

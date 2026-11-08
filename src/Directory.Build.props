@@ -33,7 +33,7 @@
     baseline's), and nothing but the baseline holds a version number.
   -->
   <PropertyGroup>
-    <PackageValidationBaselineVersion>0.2.0</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion>0.3.0</PackageValidationBaselineVersion>
     <VersionPrefix>$(PackageValidationBaselineVersion)</VersionPrefix>
     <VersionSuffix>dev</VersionSuffix>
   </PropertyGroup>
