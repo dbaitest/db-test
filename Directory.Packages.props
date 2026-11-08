@@ -1,30 +1,39 @@
 <Project>
 
   <ItemGroup>
-    <!-- Test framework -->
+    <!-- Test framework. DbTest.MSTest ships against MSTest.TestFramework only. -->
     <PackageVersion Include="MSTest" Version="4.0.2" />
-    <PackageVersion Include="MSTest.TestAdapter" Version="4.0.2" />
     <PackageVersion Include="MSTest.TestFramework" Version="4.0.2" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
 
-    <!-- Containers -->
-    <PackageVersion Include="Testcontainers" Version="4.12.0" />
-    <PackageVersion Include="Testcontainers.MsSql" Version="4.12.0" />
-    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.12.0" />
-    <PackageVersion Include="Testcontainers.MySql" Version="4.12.0" />
+    <!-- Containers. 4.16.0 or later: it brings SSH.NET 2026.0.0 (GHSA-mggc-4xg6-vcxf, GHSA-q939-rpr3-3284). -->
+    <PackageVersion Include="Testcontainers.MsSql" Version="4.16.0" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.16.0" />
+    <PackageVersion Include="Testcontainers.MySql" Version="4.16.0" />
 
     <!-- ADO.NET drivers -->
-    <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.1.1" />
-    <PackageVersion Include="Npgsql" Version="8.0.8" />
-    <PackageVersion Include="MySqlConnector" Version="2.6.1" />
+    <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.1.8" />
+    <!-- Npgsql 10 ships net8.0 and net10.0 assets, so one version serves both targets. -->
+    <PackageVersion Include="Npgsql" Version="10.0.3" />
+    <!-- 2.6.1 or later: GHSA-473q-m89c-ghf8. -->
+    <PackageVersion Include="MySqlConnector" Version="2.6.2" />
+  </ItemGroup>
 
-    <!-- Data access + test data -->
-    <PackageVersion Include="Dapper" Version="2.1.66" />
-    <PackageVersion Include="Bogus" Version="35.6.5" />
+  <!--
+    Transitive pins. CentralPackageTransitivePinningEnabled turns each of these into a direct
+    dependency of the package that pulls it in, so consumers get the patched version too.
 
-    <!-- CLI -->
-    <PackageVersion Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+    Microsoft.Data.SqlClient (every 6.x and 7.x release) still depends on a
+    System.Security.Cryptography.Pkcs that is vulnerable to GHSA-846f-f764-76mx and
+    GHSA-2fmv-rv2c-59x7. The pin keeps the major version SqlClient chose for each framework
+    (8.x for net8.0, 9.x for the net9.0 asset that net10.0 resolves) at its patched release.
+    Drop the pin when SqlClient ships a patched dependency; NuGetAudit fails the build if it
+    is ever needed again.
+  -->
+  <ItemGroup>
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="8.0.2" Condition="'$(TargetFramework)' == 'net8.0'" />
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="9.0.22" Condition="'$(TargetFramework)' != 'net8.0'" />
   </ItemGroup>
 
 </Project>

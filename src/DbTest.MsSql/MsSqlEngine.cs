@@ -4,6 +4,7 @@ using DbTest.Core.Engine;
 using DbTest.Core.Schema;
 
 using Microsoft.Data.SqlClient;
+
 using Testcontainers.MsSql;
 
 namespace DbTest.MsSql;
@@ -22,17 +23,15 @@ namespace DbTest.MsSql;
 /// <para>
 /// The Testcontainers SQL Server builder always logs in as <c>sa</c> and always starts on
 /// <c>master</c>: it exposes no way to choose either. The target database is therefore
-/// created here after the container is up, and the connection string is assembled from the
-/// mapped port.
+/// created here after the container is up, and the connection string is derived from the
+/// container's own, so the Docker host (local, remote or Docker-in-Docker) is the one
+/// Testcontainers resolved.
 /// </para>
 /// </remarks>
-public sealed class MsSqlEngine : IDbEngine
+public sealed class MsSqlEngine : DbEngine
 {
     /// <summary>The image used when none is specified.</summary>
     public const string DefaultContainerImage = "mcr.microsoft.com/mssql/server:2022-latest";
-
-    /// <summary>The port SQL Server listens on inside the container.</summary>
-    private const int ContainerPort = 1433;
 
     /// <summary>The login the SQL Server container always uses.</summary>
     private const string Login = "sa";
@@ -44,24 +43,116 @@ public sealed class MsSqlEngine : IDbEngine
     /// </summary>
     private const string DefaultPassword = "Password!1";
 
-    /// <inheritdoc />
-    public string Name => "mssql";
+    /// <summary>
+    /// Empties every table and puts every identity column back to its seed.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A table no foreign key references is TRUNCATEd: that empties it and resets its identity
+    /// to exactly the declared seed, whatever the column type. SQL Server refuses to TRUNCATE a
+    /// table a foreign key references (even a disabled one), so those tables are emptied with
+    /// DELETE while every constraint is disabled, and the constraints are re-enabled
+    /// <c>WITH CHECK</c> so the optimizer still trusts them.
+    /// </para>
+    /// <para>
+    /// A DELETEd table's identity is reseeded, and the value depends on its history:
+    /// <c>DBCC CHECKIDENT … RESEED, n</c> makes the next row <c>n + increment</c> when the table
+    /// has ever held a row, but <c>n</c> itself when it never has (<c>last_value</c> is NULL).
+    /// A fixed 0 therefore gave a never-used table a first id of 0 while every other engine
+    /// gives 1. When <c>seed − increment</c> is outside the column's type — a referenced
+    /// <c>tinyint IDENTITY(0,1)</c> that has held rows — no reseed can make the next id the
+    /// seed, so the clean fails with a message naming the table instead of DBCC's
+    /// "Parameter 3 is incorrect".
+    /// </para>
+    /// </remarks>
+    private const string CleanSql = """
+        DECLARE @sql nvarchar(max) = N'';
+        DECLARE @referenced TABLE (object_id int PRIMARY KEY);
+
+        INSERT INTO @referenced (object_id)
+        SELECT DISTINCT referenced_object_id FROM sys.foreign_keys;
+
+        SELECT @sql = @sql + N'ALTER TABLE ' + QUOTENAME(s.name) + N'.' + QUOTENAME(t.name) + N' NOCHECK CONSTRAINT ALL;' + CHAR(10)
+        FROM sys.tables t
+        JOIN sys.schemas s ON s.schema_id = t.schema_id
+        WHERE t.is_ms_shipped = 0;
+
+        SELECT @sql = @sql
+            + CASE WHEN r.object_id IS NULL THEN N'TRUNCATE TABLE ' ELSE N'DELETE FROM ' END
+            + QUOTENAME(s.name) + N'.' + QUOTENAME(t.name) + N';' + CHAR(10)
+        FROM sys.tables t
+        JOIN sys.schemas s ON s.schema_id = t.schema_id
+        LEFT JOIN @referenced r ON r.object_id = t.object_id
+        WHERE t.is_ms_shipped = 0;
+
+        SELECT @sql = @sql + N'ALTER TABLE ' + QUOTENAME(s.name) + N'.' + QUOTENAME(t.name) + N' WITH CHECK CHECK CONSTRAINT ALL;' + CHAR(10)
+        FROM sys.tables t
+        JOIN sys.schemas s ON s.schema_id = t.schema_id
+        WHERE t.is_ms_shipped = 0;
+
+        SELECT @sql = @sql
+            + N'BEGIN TRY DBCC CHECKIDENT (N''' + REPLACE(QUOTENAME(s.name) + N'.' + QUOTENAME(t.name), N'''', N'''''')
+            + N''', RESEED, '
+            + CAST(CASE WHEN ic.last_value IS NULL
+                        THEN CAST(ic.seed_value AS decimal(38, 0))
+                        ELSE CAST(ic.seed_value AS decimal(38, 0)) - CAST(ic.increment_value AS decimal(38, 0))
+                   END AS nvarchar(40))
+            + N') WITH NO_INFOMSGS; END TRY BEGIN CATCH THROW 50000, N'''
+            + REPLACE(
+                N'DbTest cannot reset the identity of ' + QUOTENAME(s.name) + N'.' + QUOTENAME(t.name)
+                    + N' to its seed: a foreign key references the table, so it cannot be truncated, '
+                    + N'and seed minus increment is outside the range of the column type.',
+                N'''', N'''''')
+            + N''', 1; END CATCH;' + CHAR(10)
+        FROM sys.tables t
+        JOIN sys.schemas s ON s.schema_id = t.schema_id
+        JOIN sys.identity_columns ic ON ic.object_id = t.object_id
+        JOIN @referenced r ON r.object_id = t.object_id
+        WHERE t.is_ms_shipped = 0;
+
+        EXEC sp_executesql @sql;
+        """;
+
+    private const string ListObjectsSql = """
+        SELECT
+            s.name       AS schema_name,
+            o.name       AS object_name,
+            RTRIM(CAST(o.type AS NVARCHAR(2))) AS object_type,
+            c.name       AS column_name
+        FROM sys.objects o
+        JOIN sys.schemas s ON s.schema_id = o.schema_id
+        LEFT JOIN sys.columns c ON c.object_id = o.object_id
+        WHERE o.is_ms_shipped = 0
+          AND o.type IN ('U', 'V', 'P', 'FN', 'IF', 'TF')
+        ORDER BY s.name, o.name, c.column_id;
+        """;
 
     /// <inheritdoc />
-    public string DefaultImage => DefaultContainerImage;
+    public override string Name => "mssql";
 
     /// <inheritdoc />
-    public DbConnection CreateConnection(string connectionString) => new SqlConnection(connectionString);
+    public override string DefaultImage => DefaultContainerImage;
 
     /// <inheritdoc />
-    public async Task<IDbContainerHandle> StartContainerAsync(
+    public override DbConnection CreateConnection(string connectionString) => new SqlConnection(connectionString);
+
+    /// <inheritdoc />
+    /// <exception cref="ArgumentException">A login other than <c>sa</c> was requested.</exception>
+    public override async Task<IDbContainerHandle> StartContainerAsync(
         DbContainerOptions options,
         CancellationToken cancellationToken = default)
     {
-        var password = options.Password ?? DefaultPassword;
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (options.Username is not null && !string.Equals(options.Username, Login, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException(
+                $"The SQL Server container always logs in as '{Login}'; '{options.Username}' cannot be used.",
+                nameof(options));
+        }
 
         var builder = new MsSqlBuilder(options.Image ?? DefaultContainerImage)
-            .WithPassword(password);
+            .WithPassword(options.Password ?? DefaultPassword);
 
         foreach (var (key, value) in options.Environment)
         {
@@ -69,30 +160,38 @@ public sealed class MsSqlEngine : IDbEngine
         }
 
         var container = builder.Build();
-        await container.StartAsync(cancellationToken).ConfigureAwait(false);
 
         try
         {
-            var port = container.GetMappedPublicPort(ContainerPort);
-            var masterConnectionString = BuildConnectionString(port, "master", password);
+            using var startup = CreateStartupToken(options, cancellationToken);
+            await container.StartAsync(startup.Token).ConfigureAwait(false);
 
-            await using (var connection = new SqlConnection(masterConnectionString))
+            var master = new SqlConnectionStringBuilder(container.GetConnectionString())
             {
-                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+                InitialCatalog = "master",
+                TrustServerCertificate = true,
+                Encrypt = false,
+            };
 
+            await using (var connection = new SqlConnection(master.ConnectionString))
+            {
+                await connection.OpenAsync(startup.Token).ConfigureAwait(false);
+
+                // CREATE DATABASE takes no parameter, so the name is escaped as an identifier
+                // and the existence check is parameterised.
                 await using var command = connection.CreateCommand();
                 command.CommandText = $"""
                     IF DB_ID(@database) IS NULL
                     BEGIN
-                        EXEC('CREATE DATABASE [{Escape(options.Database)}]');
+                        EXEC(N'CREATE DATABASE {QuoteIdentifierForDynamicSql(options.Database)}');
                     END
                     """;
-                command.Parameters.AddWithValue("@database", options.Database);
-                await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+                command.Parameters.Add(new SqlParameter("@database", options.Database));
+                await command.ExecuteNonQueryAsync(startup.Token).ConfigureAwait(false);
             }
 
-            var connectionString = BuildConnectionString(port, options.Database, password);
-            return new MsSqlContainerHandle(container, connectionString);
+            var target = new SqlConnectionStringBuilder(master.ConnectionString) { InitialCatalog = options.Database };
+            return new MsSqlContainerHandle(container, target.ConnectionString);
         }
         catch
         {
@@ -102,188 +201,44 @@ public sealed class MsSqlEngine : IDbEngine
     }
 
     /// <inheritdoc />
-    public async Task<SchemaApplyResult> ApplySchemaAsync(
-        DbConnection connection,
-        IReadOnlyList<SchemaScript> scripts,
-        CancellationToken cancellationToken = default)
-    {
-        var applied = new List<string>();
-        var failures = new List<SchemaApplyFailure>();
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-
-        foreach (var script in scripts)
-        {
-            var batches = SqlStatementSplitter.SplitOnGo(script.Content);
-
-            try
-            {
-                foreach (var batch in batches)
-                {
-                    await using var command = connection.CreateCommand();
-                    command.CommandText = batch;
-                    command.CommandTimeout = 120;
-                    await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-                }
-
-                applied.Add(script.RelativePath);
-            }
-            catch (Exception ex)
-            {
-                failures.Add(new SchemaApplyFailure(script.RelativePath, ex.Message));
-            }
-        }
-
-        stopwatch.Stop();
-        return new SchemaApplyResult(applied, failures, stopwatch.Elapsed);
-    }
-
-    /// <inheritdoc />
-    public async Task<IReadOnlyList<SchemaObject>> ListObjectsAsync(
+    public override async Task<IReadOnlyList<SchemaObject>> ListObjectsAsync(
         DbConnection connection,
         CancellationToken cancellationToken = default)
     {
-        const string sql = """
-            SELECT
-                s.name       AS schema_name,
-                o.name       AS object_name,
-                RTRIM(CAST(o.type AS NVARCHAR(2))) AS object_type,
-                c.name       AS column_name,
-                c.column_id  AS column_id
-            FROM sys.objects o
-            JOIN sys.schemas s ON s.schema_id = o.schema_id
-            LEFT JOIN sys.columns c ON c.object_id = o.object_id
-            WHERE o.is_ms_shipped = 0
-              AND o.type IN ('U', 'V', 'P', 'FN', 'IF', 'TF')
-            ORDER BY s.name, o.name, c.column_id;
-            """;
+        var collector = new SchemaObjectCollector();
 
-        await using var command = connection.CreateCommand();
-        command.CommandText = sql;
+        await ReadRowsAsync(
+            connection,
+            ListObjectsSql,
+            row => collector.Add(
+                row.GetString(0),
+                row.GetString(1),
+                MapKind(row.GetString(2)),
+                row.IsDBNull(3) ? null : row.GetString(3)),
+            cancellationToken).ConfigureAwait(false);
 
-        var objects = new Dictionary<string, SchemaObjectBuilder>(StringComparer.OrdinalIgnoreCase);
-
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-        {
-            var schema = reader.GetString(0);
-            var name = reader.GetString(1);
-            var type = reader.GetString(2);
-            var key = $"{schema}.{name}";
-
-            if (!objects.TryGetValue(key, out var builder))
-            {
-                builder = new SchemaObjectBuilder(schema, name, MapKind(type));
-                objects[key] = builder;
-            }
-
-            if (!reader.IsDBNull(3))
-            {
-                builder.Columns.Add(reader.GetString(3));
-            }
-        }
-
-        return objects.Values.Select(b => b.Build()).ToList();
+        return collector.Build();
     }
 
     /// <inheritdoc />
-    public async Task CleanAsync(DbConnection connection, CancellationToken cancellationToken = default)
+    public override async Task CleanAsync(DbConnection connection, CancellationToken cancellationToken = default)
     {
-        // Emptied in one batch. SQL Server refuses to TRUNCATE a table that another table
-        // references, and emptying them in dependency order means walking the foreign key
-        // graph. Disabling the constraints for the duration of the batch is the standard way
-        // to do this inside a throwaway container.
-        const string sql = """
-            DECLARE @sql nvarchar(max) = N'';
-
-            SELECT @sql = @sql + N'ALTER TABLE ' + QUOTENAME(s.name) + N'.' + QUOTENAME(t.name) + N' NOCHECK CONSTRAINT ALL;' + CHAR(13)
-            FROM sys.tables t
-            JOIN sys.schemas s ON s.schema_id = t.schema_id;
-
-            SELECT @sql = @sql + N'DELETE FROM ' + QUOTENAME(s.name) + N'.' + QUOTENAME(t.name) + N';' + CHAR(13)
-            FROM sys.tables t
-            JOIN sys.schemas s ON s.schema_id = t.schema_id;
-
-            SELECT @sql = @sql + N'ALTER TABLE ' + QUOTENAME(s.name) + N'.' + QUOTENAME(t.name) + N' CHECK CONSTRAINT ALL;' + CHAR(13)
-            FROM sys.tables t
-            JOIN sys.schemas s ON s.schema_id = t.schema_id;
-
-            SELECT @sql = @sql + N'DBCC CHECKIDENT (' + QUOTENAME(s.name + N'.' + t.name) + N', RESEED, 0);' + CHAR(13)
-            FROM sys.tables t
-            JOIN sys.schemas s ON s.schema_id = t.schema_id
-            WHERE EXISTS (SELECT 1 FROM sys.identity_columns ic WHERE ic.object_id = t.object_id);
-
-            EXEC sp_executesql @sql;
-            """;
-
-        await using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.CommandTimeout = 120;
-        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        await ExecuteAsync(connection, CleanSql, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public Task<int> ExecuteAsync(DbConnection connection, string sql, CancellationToken cancellationToken = default)
+    protected override IReadOnlyList<string> SplitScript(SchemaScript script)
     {
-        return ExecuteAsync(connection, sql, [], cancellationToken);
+        ArgumentNullException.ThrowIfNull(script);
+        return SqlStatementSplitter.SplitOnGo(script.Content);
     }
 
-    /// <inheritdoc />
-    public async Task<int> ExecuteAsync(
-        DbConnection connection,
-        string sql,
-        IReadOnlyList<DbParameterValue> parameters,
-        CancellationToken cancellationToken = default)
-    {
-        await using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.CommandTimeout = 120;
-
-        foreach (var parameter in parameters)
-        {
-            var dbParameter = command.CreateParameter();
-            dbParameter.ParameterName = parameter.Name;
-            dbParameter.Value = parameter.Value ?? DBNull.Value;
-            command.Parameters.Add(dbParameter);
-        }
-
-        return await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-    }
-
-    /// <inheritdoc />
-    public Task<T?> QuerySingleAsync<T>(DbConnection connection, string sql, CancellationToken cancellationToken = default)
-    {
-        return QuerySingleAsync<T>(connection, sql, [], cancellationToken);
-    }
-
-    /// <inheritdoc />
-    public async Task<T?> QuerySingleAsync<T>(
-        DbConnection connection,
-        string sql,
-        IReadOnlyList<DbParameterValue> parameters,
-        CancellationToken cancellationToken = default)
-    {
-        await using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.CommandTimeout = 120;
-
-        foreach (var parameter in parameters)
-        {
-            var dbParameter = command.CreateParameter();
-            dbParameter.ParameterName = parameter.Name;
-            dbParameter.Value = parameter.Value ?? DBNull.Value;
-            command.Parameters.Add(dbParameter);
-        }
-
-        var value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
-        return value is null or DBNull
-            ? default
-            : (T)Convert.ChangeType(value, typeof(T), System.Globalization.CultureInfo.InvariantCulture);
-    }
-
-    private static string BuildConnectionString(int port, string database, string password) =>
-        $"Server=127.0.0.1,{port};Database={database};User Id={Login};Password={password};TrustServerCertificate=True;Encrypt=False";
-
-    private static string Escape(string identifier) => identifier.Replace("]", "]]", StringComparison.Ordinal);
+    /// <summary>
+    /// Quotes a database name as <c>[name]</c>, and doubles the single quotes as well because
+    /// the result is embedded in an <c>N'…'</c> literal passed to <c>EXEC</c>.
+    /// </summary>
+    private static string QuoteIdentifierForDynamicSql(string identifier) =>
+        "[" + identifier.Replace("]", "]]", StringComparison.Ordinal).Replace("'", "''", StringComparison.Ordinal) + "]";
 
     private static SchemaObjectKind MapKind(string sqlServerType) => sqlServerType switch
     {
@@ -291,36 +246,14 @@ public sealed class MsSqlEngine : IDbEngine
         "V" => SchemaObjectKind.View,
         _ => SchemaObjectKind.Routine,
     };
-
-    private sealed class SchemaObjectBuilder(string schema, string name, SchemaObjectKind kind)
-    {
-        public string Schema { get; } = schema;
-
-        public string Name { get; } = name;
-
-        public SchemaObjectKind Kind { get; } = kind;
-
-        public List<string> Columns { get; } = [];
-
-        public SchemaObject Build() => new(Schema, Name, Kind, Columns);
-    }
 }
 
 /// <summary>Handle to a running SQL Server container.</summary>
-internal sealed class MsSqlContainerHandle : IDbContainerHandle
+internal sealed class MsSqlContainerHandle(MsSqlContainer container, string connectionString) : IDbContainerHandle
 {
-    private readonly MsSqlContainer _container;
+    public string ConnectionString { get; } = connectionString;
 
-    public MsSqlContainerHandle(MsSqlContainer container, string connectionString)
-    {
-        _container = container;
-        ConnectionString = connectionString;
-        Image = container.Image.FullName;
-    }
+    public string Image { get; } = container.Image.FullName;
 
-    public string ConnectionString { get; }
-
-    public string Image { get; }
-
-    public ValueTask DisposeAsync() => _container.DisposeAsync();
+    public ValueTask DisposeAsync() => container.DisposeAsync();
 }

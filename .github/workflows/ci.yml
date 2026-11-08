@@ -6,36 +6,70 @@ on:
   pull_request:
     branches: [main]
 
+# The default token is read-only. Nothing in CI writes to the repository.
+permissions:
+  contents: read
+
+# A newer push to the same pull request makes the older run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Actions are pinned to a full commit SHA, with the release tag in a comment; Dependabot
+# keeps both up to date. A tag can be moved, a SHA cannot.
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # The Linux leg keeps the plain name "build": branch protection on main requires a check
+    # with exactly that name. The Windows leg reports as "build (windows)".
+    name: ${{ matrix.os == 'ubuntu-latest' && 'build' || 'build (windows)' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows catches CRLF and path-separator bugs in the splitters and the loader.
+        os: [ubuntu-latest, windows-latest]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # The libraries, the CLI and the suite target net8.0, net9.0 and net10.0, so the
-      # runner needs the runtime of each one. The SDK itself is pinned by global.json:
-      # targeting net10.0 needs a .NET 10 SDK.
-      - uses: actions/setup-dotnet@v4
+      # The projects target net8.0 and net10.0, so the runner needs both runtimes. The SDK
+      # itself is pinned by global.json: targeting net10.0 needs a .NET 10 SDK.
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: |
             8.0.x
-            9.0.x
             10.0.x
-
-      - name: Show installed runtimes
-        run: dotnet --list-runtimes
 
       - name: Restore
         run: dotnet restore
 
+      # Warnings are errors, code style is enforced and NuGetAudit fails on a vulnerable
+      # dependency, so a green build means all three.
       - name: Build
         run: dotnet build --configuration Release --no-restore
 
-      # No filter on the framework: this runs the unit tests once per target framework,
-      # which is the cheapest proof that the code compiles and runs on all three.
+      # Runs once per target framework: the cheapest proof the code runs on both.
       - name: Unit tests
-        run: dotnet test --configuration Release --no-build --filter "FullyQualifiedName~Unit"
+        run: >-
+          dotnet test tests/DbTest.Core.Tests
+          --configuration Release
+          --no-build
+          --collect "XPlat Code Coverage"
+          --results-directory TestResults
+
+      - name: Upload coverage
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage
+          path: TestResults/**/coverage.cobertura.xml
+          if-no-files-found: error
+
+      # Pack runs package validation, so an API that differs between net8.0 and net10.0, or
+      # a broken package layout, fails the pull request rather than the release.
+      - name: Pack
+        if: matrix.os == 'ubuntu-latest'
+        run: dotnet pack --configuration Release --no-build --output artifacts
 
   integration:
     runs-on: ubuntu-latest
@@ -47,13 +81,12 @@ jobs:
         engine: [MsSql, PostgreSql, MySql]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: |
             8.0.x
-            9.0.x
             10.0.x
 
       - name: Restore
@@ -62,29 +95,32 @@ jobs:
       - name: Build
         run: dotnet build --configuration Release --no-restore
 
-      # One leg per supported runtime, in one job so the database image is pulled once
-      # instead of once per framework. Each leg runs on its own runtime: the net8.0 leg
-      # on .NET 8, the net9.0 leg on .NET 9, the net10.0 leg on .NET 10.
+      # One leg per supported runtime, in one job so the database image is pulled once.
+      # DBTEST_TIMING turns on the per-test timing file, which is uploaded below.
       - name: Integration tests (net8.0)
+        env:
+          DBTEST_TIMING: "1"
         run: >-
-          dotnet test
+          dotnet test tests/DbTest.Integration.Tests
           --configuration Release
           --no-build
           --framework net8.0
           --filter "FullyQualifiedName~${{ matrix.engine }}HarnessTests"
 
-      - name: Integration tests (net9.0)
-        run: >-
-          dotnet test
-          --configuration Release
-          --no-build
-          --framework net9.0
-          --filter "FullyQualifiedName~${{ matrix.engine }}HarnessTests"
-
       - name: Integration tests (net10.0)
+        env:
+          DBTEST_TIMING: "1"
         run: >-
-          dotnet test
+          dotnet test tests/DbTest.Integration.Tests
           --configuration Release
           --no-build
           --framework net10.0
           --filter "FullyQualifiedName~${{ matrix.engine }}HarnessTests"
+
+      - name: Upload timings
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: timings-${{ matrix.engine }}
+          path: tests/DbTest.Integration.Tests/bin/Release/*/dbtest-timing.tsv
+          if-no-files-found: ignore

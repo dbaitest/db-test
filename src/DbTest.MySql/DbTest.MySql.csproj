@@ -1,9 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>$(DbTestTargetFrameworks)</TargetFrameworks>
     <Description>MySQL engine for DbTest: container lifecycle, DELIMITER-aware schema application and MySQL introspection.</Description>
-    <IsPackable>true</IsPackable>
     <PackageId>DbTest.MySql</PackageId>
     <RootNamespace>DbTest.MySql</RootNamespace>
   </PropertyGroup>
@@ -11,10 +9,6 @@
   <ItemGroup>
     <PackageReference Include="MySqlConnector" />
     <PackageReference Include="Testcontainers.MySql" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
 
   <ItemGroup>

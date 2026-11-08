@@ -10,11 +10,11 @@ namespace DbTest.Core.Engine;
 /// </remarks>
 public static class EngineRegistry
 {
-    private static readonly Dictionary<string, Func<IDbEngine>> Factories =
+    private static readonly Dictionary<string, Func<DbEngine>> Factories =
         new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Registers an engine under a name. Later registrations replace earlier ones.</summary>
-    public static void Register(string name, Func<IDbEngine> factory)
+    public static void Register(string name, Func<DbEngine> factory)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(factory);
@@ -26,7 +26,7 @@ public static class EngineRegistry
 
     /// <summary>Creates the engine registered under <paramref name="name"/>.</summary>
     /// <exception cref="DbTestException">No engine is registered under that name.</exception>
-    public static IDbEngine Create(string name)
+    public static DbEngine Create(string name)
     {
         if (!Factories.TryGetValue(name, out var factory))
         {

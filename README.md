@@ -12,34 +12,66 @@ Every run gets a throwaway database container. Nothing touches a shared, staging
 production database.
 
 ```csharp
-public abstract class OrderTests : EngineTestBase
-{
-    protected override string EngineName => "postgres";
+using DbTest.Core.Engine;
+using DbTest.MsSql;
+using DbTest.MSTest;
+using DbTest.MySql;
+using DbTest.PostgreSql;
 
+// The tests, written once. No engine name appears in them.
+public abstract class CustomerTests : DbTestBase
+{
     [TestMethod]
-    public async Task Total_Should_Sum_The_Customer_Orders()
+    public async Task Inserted_Customer_Should_Be_Counted()
     {
+        await Harness.CleanAsync();
         await Harness.ExecuteAsync(
             "INSERT INTO customers (email, display_name) VALUES (@email, @name)",
             [new DbParameterValue("@email", "ada@example.test"), new DbParameterValue("@name", "Ada")]);
 
-        var total = await Harness.QuerySingleAsync<int>(
+        var count = await Harness.QueryScalarAsync<int>(
             "SELECT COUNT(*) FROM customers WHERE email = @email",
             [new DbParameterValue("@email", "ada@example.test")]);
 
-        Assert.AreEqual(1, total);
+        Assert.AreEqual(1, count);
     }
 }
 
+// One class per engine: which engine, and where its schema lives.
 [TestClass]
-public sealed class PostgresOrderTests : OrderTests { }
+public sealed class PostgresCustomerTests : CustomerTests
+{
+    protected override DbEngine CreateEngine() => new PostgreSqlEngine();
+    protected override string SchemaRoot => "Schema/postgres";
+}
+
 [TestClass]
-public sealed class MsSqlOrderTests : OrderTests { }
+public sealed class MsSqlCustomerTests : CustomerTests
+{
+    protected override DbEngine CreateEngine() => new MsSqlEngine();
+    protected override string SchemaRoot => "Schema/mssql";
+}
+
 [TestClass]
-public sealed class MySqlOrderTests : OrderTests { }
+public sealed class MySqlCustomerTests : CustomerTests
+{
+    protected override DbEngine CreateEngine() => new MySqlEngine();
+    protected override string SchemaRoot => "Schema/mysql";
+}
 ```
 
-The assertions are written once. No engine name appears in them.
+```csharp
+// Once per test project: tests share a container, so they run one at a time, and the
+// containers are removed as soon as the run ends.
+[assembly: DoNotParallelize]
+
+[TestClass]
+public static class TestRun
+{
+    [AssemblyCleanup]
+    public static Task Cleanup() => DbTestRun.DisposeAllAsync();
+}
+```
 
 ## Why
 
@@ -48,23 +80,23 @@ by hand:
 
 | Problem | What `db-test` does |
 |---|---|
-| Where does the test database come from? | A throwaway container per engine, started and destroyed by the harness. |
+| Where does the test database come from? | A throwaway container per engine, started on first use and shared by the run. |
 | How does the schema get there? | Schema files on disk, applied in order, with each engine's own splitting rules. |
-| A test dropped a table and the next test failed on a missing object | The **shape guard** names the class that changed the shape. |
-| One test's rows leaked into the next | `Clean()` empties every table in foreign-key order and resets identity counters. |
-| "The suite is slow" | Optional per-test timing output (`DBTEST_TIMING=1`). |
-| The same assertions written three times | The engine sits behind an interface. |
+| A test dropped a column and the next test failed on it | The **shape guard** fails the test that did it, naming the object and the change. |
+| One test's rows leaked into the next | `CleanAsync()` empties every table whatever the foreign keys, and resets identity counters. |
+| "The suite is slow" | Per-test timings in a TSV file (`DBTEST_TIMING=1`). |
+| The same assertions written three times | The engine sits behind one abstract class. |
 
 ## Install
 
 ```bash
-dotnet add package DbTest.Core          # the harness
+dotnet add package DbTest.MSTest        # base class for MSTest (brings DbTest.Core)
 dotnet add package DbTest.MsSql         # SQL Server engine
 dotnet add package DbTest.PostgreSql    # PostgreSQL engine
 dotnet add package DbTest.MySql         # MySQL engine
 ```
 
-Or the CLI:
+`DbTest.Core` alone gives the harness without any test framework. The CLI:
 
 ```bash
 dotnet tool install --global DbTest.Cli
@@ -74,14 +106,14 @@ dotnet tool install --global DbTest.Cli
 
 - **Docker** must be running. The harness starts real containers through
   [Testcontainers](https://github.com/testcontainers/testcontainers-dotnet).
-- **.NET 8 or newer** must be installed. The packages ship a `net8.0`, a `net9.0` and a
-  `net10.0` asset, so the runtime you have is the runtime the package was built for. The
-  CLI and the test host also roll forward: a build for .NET 8 runs on .NET 9, 10 and later
-  when the .NET 8 runtime is not installed.
+- **.NET 8 or newer.** The packages ship a `net8.0` and a `net10.0` asset: .NET 8 and 9
+  resolve the `net8.0` one, .NET 10 and later the `net10.0` one. The CLI rolls forward, so
+  it runs on whichever of those runtimes is installed.
 
 ## The schema
 
-Point the harness at a directory of SQL files:
+Point the harness at a directory of SQL files — through `SchemaRoot` in the base class, or
+directly:
 
 ```csharp
 await using var harness = await DbTestHarness.StartAsync(
@@ -89,18 +121,26 @@ await using var harness = await DbTestHarness.StartAsync(
     schemaRoot: "Schema/postgres");
 ```
 
-Files are discovered recursively, ordered by path, and applied one after another. Each
-engine applies them its own way:
+Copy the files next to the test binaries so a relative path works:
+
+```xml
+<None Include="Schema\**\*" CopyToOutputDirectory="PreserveNewest" />
+```
+
+Files are discovered recursively, ordered by their relative path (`001_tables.sql` before
+`002_procedures.sql` — use leading zeros), and applied one after another. Each engine applies
+them its own way:
 
 | | SQL Server | PostgreSQL | MySQL |
 |---|---|---|---|
 | File format | `.sql` | `.sql` / `.psql` | `.sql` |
-| Batch separator | `GO` (a client directive the server rejects) | none | `DELIMITER` |
+| Batch separator | `GO` (a client directive the server rejects), with `GO n` repeat counts | none | `DELIMITER` |
 | Function body | `CREATE PROCEDURE` | `$$ … $$` | `BEGIN … END` |
-| Applied as | one batch per `GO` segment | one statement per file | one statement per delimiter segment |
+| Applied as | one batch per `GO` segment | the whole file as one command | one statement per delimiter |
 
-The splitter tracks string literals, line and block comments, dollar-quoted bodies and
-`DELIMITER` directives, so a semicolon inside any of them does not split a statement.
+The splitters are real scanners: a `GO` or a delimiter inside a string literal, a quoted
+identifier or a comment is never a separator, and a column named `delimiter_char` is not a
+`DELIMITER` directive.
 
 Excluded files are **reported**, never silently dropped:
 
@@ -109,7 +149,7 @@ var load = SchemaLoader.Load("Schema/postgres", new SchemaLoadOptions
 {
     ExcludedDirectories = ["maintenance", "scripts"],
     ExcludedFileNamePatterns = ["^create_", "^fix_"],
-    OrderedDirectories = ["tables", "procedures"],
+    OrderedDirectories = ["tables", "procedures"],   // each with its subdirectories, first
 });
 
 foreach (var exclusion in load.Excluded)
@@ -119,12 +159,8 @@ foreach (var exclusion in load.Excluded)
 ```
 
 A schema that only partly applied fails loudly at setup rather than surfacing later as
-unrelated test failures:
-
-```csharp
-var applied = await engine.ApplySchemaAsync(connection, load.Scripts);
-applied.ThrowIfFailed();   // throws SchemaApplyException listing every broken file
-```
+unrelated test failures: `StartAsync` throws a `SchemaApplyException` listing every broken
+file.
 
 ## The shape guard
 
@@ -132,18 +168,25 @@ A shared container means a shared schema. A test that drops or re-types a table 
 next test failing for the wrong reason — and the failure points at the victim, not the
 culprit.
 
-The guard snapshots every object after the schema is applied, re-reads it after each test
-class, and names the class that changed the shape:
+The guard snapshots every table, view and routine after the schema is applied. `DbTestBase`
+re-reads them after every test and fails the test that changed one:
 
 ```
-[ShapeGuard] OrderTests left dbo.customers columns changed (id,email) -> (id,email,probe)
+Assert.Fail failed. The test left a shared database object reshaped. Restore it before the
+test ends (the shape guard compares against the schema as applied):
+[ShapeGuard] CustomerTests.Adds_A_Column left dbo.customers columns changed (id,email) -> (id,email,probe)
 ```
+
+The culprit is blamed once; the tests after it are not. An object that is put back is
+forgotten, so the next test to break it is blamed again. Objects a test creates are not
+watched — only the schema as applied.
 
 It detects and blames. It does not repair: a silent repair hides the leak from the next run,
-and the next run is exactly when you want to see it.
+and the next run is exactly when you want to see it. Override `FailOnShapeLeak` to only log
+the leak. Without the base class:
 
 ```csharp
-var leaks = await harness.CheckShapeAsync("OrderTests");
+var leaks = await harness.CheckShapeAsync("CustomerTests.Adds_A_Column");
 ```
 
 ## Cleanup
@@ -152,8 +195,25 @@ var leaks = await harness.CheckShapeAsync("OrderTests");
 await harness.CleanAsync();
 ```
 
-Empties every user table in foreign-key order and resets identity counters. The container is
-discarded afterwards, so this is about isolating tests from each other, not about hygiene.
+Empties every user table, whatever the foreign keys between them, and puts every identity
+column back to its seed, so the next row gets the same id on every engine. (MySQL keeps no
+seed apart from the counter: its tables restart at 1.)
+
+## Queries
+
+```csharp
+var count = await harness.QueryScalarAsync<int>("SELECT COUNT(*) FROM orders");
+var newest = await harness.QueryScalarAsync<DateTimeOffset?>("SELECT MAX(placed_at) FROM orders");
+```
+
+`QueryScalarAsync<T>` reads the first column of the first row; SQL NULL or no row gives
+`default`. It absorbs the drivers' differences: `COUNT(*)` is `int` on SQL Server and `bigint`
+elsewhere, MySQL returns a `CHAR(36)` where SQL Server returns a `uniqueidentifier`, and
+nullable targets work. For anything richer, open a connection:
+
+```csharp
+await using var connection = await harness.OpenConnectionAsync();
+```
 
 ## Diagnostics
 
@@ -161,35 +221,42 @@ discarded afterwards, so this is about isolating tests from each other, not abou
 DBTEST_TIMING=1 dotnet test
 ```
 
-Writes one row per test to `dbtest-timing.tsv` next to the test binaries. Off by default; no
-file is written and no query runs unless it is switched on.
+With `DbTest.MSTest`, writes one row per test to `dbtest-timing.tsv` next to the test
+binaries (or to `DBTEST_TIMING_FILE`). Off by default; no file is written unless it is
+switched on.
 
 ## The CLI
 
 ```bash
-dbtest engines                                  # list the registered engines
-dbtest up --engine postgres --schema Schema     # start a container, apply a schema
-dbtest schema --engine mysql --schema Schema    # apply a schema and list what it created
+dbtest engines                                         # list the registered engines
+dbtest up --engine postgres --schema Schema/postgres   # start, apply, keep running until Ctrl+C
+dbtest schema --engine mysql --schema Schema/mysql     # apply a schema and list what it created
 ```
 
 ## Layout
 
 ```
-src/DbTest.Core          engine-agnostic: schema loading, statement splitting,
-                         the harness, the shape guard, diagnostics
+src/DbTest.Core          engine-agnostic: the DbEngine base class, schema loading, statement
+                         splitting, the harness, the shape guard, diagnostics
+src/DbTest.MSTest        DbTestBase and DbTestRun for MSTest
 src/DbTest.MsSql         SQL Server engine
 src/DbTest.PostgreSql    PostgreSQL engine
 src/DbTest.MySql         MySQL engine
 src/DbTest.Cli           the `dbtest` command
+tests/DbTest.Core.Tests  unit tests, no Docker
 tests/DbTest.Integration.Tests
                          one shared test body, run against all three engines
 ```
 
 ## Writing an engine
 
-Implement `IDbEngine`. Six members: start a container, apply schema, list objects, clean,
-execute a statement, run a query. Everything else — schema discovery, ordering, exclusion,
-the shape guard — lives in the core and is shared.
+Derive from `DbEngine` and implement seven members: the name, the default image, a connection
+factory, container startup, object listing, cleaning, and splitting one schema file into
+commands. Applying a schema, running statements, binding parameters and converting scalars
+are inherited, as are schema discovery, ordering, exclusion and the shape guard.
+
+`DbEngine` is an abstract class rather than an interface so new capabilities can arrive as
+virtual members with a default, without breaking an engine written outside this repository.
 
 ## Sponsors
 
@@ -203,7 +270,8 @@ refuses — that nobody else wants to own.
 ## Contributing
 
 Every change goes through a pull request. See [CONTRIBUTING.md](CONTRIBUTING.md) for the
-workflow, the checks that run, and the merge policy.
+workflow, the checks that run, and the merge policy. Security issues: see
+[SECURITY.md](SECURITY.md). Changes per release: [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

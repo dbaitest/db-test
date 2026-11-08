@@ -2,9 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFrameworks>$(DbTestTargetFrameworks)</TargetFrameworks>
     <Description>Command line front end for DbTest: start a container, apply a schema, report on it.</Description>
-    <IsPackable>true</IsPackable>
     <PackageId>DbTest.Cli</PackageId>
     <RootNamespace>DbTest.Cli</RootNamespace>
     <AssemblyName>dbtest</AssemblyName>
@@ -17,10 +15,6 @@
     <ProjectReference Include="..\DbTest.MsSql\DbTest.MsSql.csproj" />
     <ProjectReference Include="..\DbTest.MySql\DbTest.MySql.csproj" />
     <ProjectReference Include="..\DbTest.PostgreSql\DbTest.PostgreSql.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
 
 </Project>

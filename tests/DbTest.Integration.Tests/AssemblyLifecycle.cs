@@ -1,16 +1,21 @@
-using DbTest.Core;
+using DbTest.MSTest;
+
+// The engines share one container each, and one schema per container: tests that ran in
+// parallel would see each other's rows and each other's DDL.
+[assembly: DoNotParallelize]
 
 namespace DbTest.Integration.Tests;
 
 /// <summary>
-/// Assembly-level setup: stops every container when the run ends.
+/// Assembly-level cleanup: removes every container as soon as the run ends and flushes the
+/// timing file.
 /// </summary>
 [TestClass]
-public class AssemblyLifecycle
+public static class AssemblyLifecycle
 {
     [AssemblyCleanup]
     public static async Task CleanupAsync()
     {
-        await EngineFixture.DisposeAllAsync();
+        await DbTestRun.DisposeAllAsync();
     }
 }

@@ -1,5 +1,4 @@
 using System.Data.Common;
-using System.Diagnostics;
 
 using DbTest.Core.Diagnostics;
 using DbTest.Core.Engine;
@@ -25,13 +24,13 @@ namespace DbTest.Core;
 /// </remarks>
 public sealed class DbTestHarness : IAsyncDisposable
 {
-    private readonly IDbEngine _engine;
+    private readonly DbEngine _engine;
     private readonly IDbContainerHandle _container;
     private readonly SchemaShapeGuard? _guard;
     private bool _disposed;
 
     private DbTestHarness(
-        IDbEngine engine,
+        DbEngine engine,
         IDbContainerHandle container,
         IReadOnlyDictionary<string, SchemaObject> baseline)
     {
@@ -41,7 +40,7 @@ public sealed class DbTestHarness : IAsyncDisposable
     }
 
     /// <summary>The engine this harness drives.</summary>
-    public IDbEngine Engine => _engine;
+    public DbEngine Engine => _engine;
 
     /// <summary>The connection string of the running container.</summary>
     public string ConnectionString => _container.ConnectionString;
@@ -63,12 +62,14 @@ public sealed class DbTestHarness : IAsyncDisposable
     /// <returns>A ready harness.</returns>
     /// <exception cref="SchemaApplyException">The schema failed to apply.</exception>
     public static async Task<DbTestHarness> StartAsync(
-        IDbEngine engine,
+        DbEngine engine,
         string? schemaRoot = null,
         DbContainerOptions? containerOptions = null,
         SchemaLoadOptions? loadOptions = null,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(engine);
+
         var options = containerOptions ?? new DbContainerOptions();
         var container = await engine.StartContainerAsync(options, cancellationToken).ConfigureAwait(false);
 
@@ -87,7 +88,8 @@ public sealed class DbTestHarness : IAsyncDisposable
                     .ConfigureAwait(false);
                 apply.ThrowIfFailed();
 
-                baseline = await CaptureObjectsAsync(engine, connection, cancellationToken).ConfigureAwait(false);
+                var objects = await engine.ListObjectsAsync(connection, cancellationToken).ConfigureAwait(false);
+                baseline = objects.ToDictionary(o => o.QualifiedName, StringComparer.OrdinalIgnoreCase);
             }
 
             return new DbTestHarness(engine, container, baseline);
@@ -99,21 +101,33 @@ public sealed class DbTestHarness : IAsyncDisposable
         }
     }
 
-    /// <summary>Opens a connection to the containerized database. The caller disposes it.</summary>
-    public DbConnection OpenConnection()
+    /// <summary>
+    /// Creates a connection to the containerized database without opening it. The caller opens
+    /// and disposes it.
+    /// </summary>
+    public DbConnection CreateConnection()
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         return _engine.CreateConnection(_container.ConnectionString);
     }
 
-    /// <summary>Opens and opens a connection asynchronously. The caller disposes it.</summary>
+    /// <summary>Creates and opens a connection to the containerized database. The caller disposes it.</summary>
     public async Task<DbConnection> OpenConnectionAsync(CancellationToken cancellationToken = default)
     {
-        var connection = OpenConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-        return connection;
+        var connection = CreateConnection();
+        try
+        {
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            return connection;
+        }
+        catch
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
     }
 
-    /// <summary>Empties every user table and resets identity counters.</summary>
+    /// <summary>Empties every user table and resets identity counters to their seed.</summary>
     public Task CleanAsync(CancellationToken cancellationToken = default)
     {
         return ExecuteOnConnectionAsync(
@@ -140,33 +154,48 @@ public sealed class DbTestHarness : IAsyncDisposable
             cancellationToken);
     }
 
-    /// <summary>Runs a query and maps the first row to <typeparamref name="T"/>.</summary>
-    public Task<T?> QuerySingleAsync<T>(string sql, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Runs a query and converts the first column of the first row to <typeparamref name="T"/>.
+    /// SQL NULL and an empty result both give <c>default</c>.
+    /// </summary>
+    public Task<T?> QueryScalarAsync<T>(string sql, CancellationToken cancellationToken = default)
     {
         return ExecuteOnConnectionAsync(
-            c => _engine.QuerySingleAsync<T>(c, sql, cancellationToken),
+            c => _engine.QueryScalarAsync<T>(c, sql, cancellationToken),
             cancellationToken);
     }
 
-    /// <summary>Runs a query with parameters and maps the first row to <typeparamref name="T"/>.</summary>
-    public Task<T?> QuerySingleAsync<T>(
+    /// <summary>
+    /// Runs a query with parameters and converts the first column of the first row to
+    /// <typeparamref name="T"/>. SQL NULL and an empty result both give <c>default</c>.
+    /// </summary>
+    public Task<T?> QueryScalarAsync<T>(
         string sql,
         IReadOnlyList<DbParameterValue> parameters,
         CancellationToken cancellationToken = default)
     {
         return ExecuteOnConnectionAsync(
-            c => _engine.QuerySingleAsync<T>(c, sql, parameters, cancellationToken),
+            c => _engine.QueryScalarAsync<T>(c, sql, parameters, cancellationToken),
+            cancellationToken);
+    }
+
+    /// <summary>Lists every table, view and routine in the database, as the shape guard sees them.</summary>
+    public Task<IReadOnlyList<SchemaObject>> ListObjectsAsync(CancellationToken cancellationToken = default)
+    {
+        return ExecuteOnConnectionAsync(
+            c => _engine.ListObjectsAsync(c, cancellationToken),
             cancellationToken);
     }
 
     /// <summary>
-    /// Checks whether any test reshaped a shared object, and blames the class named.
+    /// Checks whether a shared object was reshaped since the schema was applied, and blames the
+    /// test named. See <see cref="SchemaShapeGuard.CheckAsync"/>.
     /// </summary>
-    /// <param name="responsibleClass">The test class to blame.</param>
+    /// <param name="responsible">The test (or test class) to blame.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The leaks found, empty when the schema is intact.</returns>
+    /// <returns>The leaks first detected by this check, empty when the schema is intact.</returns>
     public async Task<IReadOnlyList<SchemaShapeLeak>> CheckShapeAsync(
-        string responsibleClass,
+        string responsible,
         CancellationToken cancellationToken = default)
     {
         if (_guard is null)
@@ -175,7 +204,7 @@ public sealed class DbTestHarness : IAsyncDisposable
         }
 
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        return await _guard.CheckAsync(connection, responsibleClass, cancellationToken).ConfigureAwait(false);
+        return await _guard.CheckAsync(connection, responsible, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Runs an action against a freshly opened connection and closes it afterwards.</summary>
@@ -183,6 +212,8 @@ public sealed class DbTestHarness : IAsyncDisposable
         Func<DbConnection, Task<T>> action,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(action);
+
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         return await action(connection).ConfigureAwait(false);
     }
@@ -192,6 +223,8 @@ public sealed class DbTestHarness : IAsyncDisposable
         Func<DbConnection, Task> action,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(action);
+
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await action(connection).ConfigureAwait(false);
     }
@@ -206,14 +239,5 @@ public sealed class DbTestHarness : IAsyncDisposable
 
         _disposed = true;
         await _container.DisposeAsync().ConfigureAwait(false);
-    }
-
-    private static async Task<IReadOnlyDictionary<string, SchemaObject>> CaptureObjectsAsync(
-        IDbEngine engine,
-        DbConnection connection,
-        CancellationToken cancellationToken)
-    {
-        var objects = await engine.ListObjectsAsync(connection, cancellationToken).ConfigureAwait(false);
-        return objects.ToDictionary(o => o.QualifiedName, StringComparer.OrdinalIgnoreCase);
     }
 }

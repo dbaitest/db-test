@@ -25,29 +25,35 @@ git config core.hooksPath .githooks
 ## Before you open the pull request
 
 ```bash
-dotnet build
-dotnet test --filter "FullyQualifiedName~Unit"           # fast, no container
-dotnet test -f net8.0                                    # all three engines, one runtime
+dotnet build                                                     # warnings are errors
+dotnet test tests/DbTest.Core.Tests                              # unit tests, no Docker
+dotnet test tests/DbTest.Integration.Tests -f net10.0            # all three engines, one runtime
 ```
 
-Docker must be running: the integration tests start real database containers.
+Docker must be running for the integration tests: they start real database containers.
 
-Everything targets `net8.0`, `net9.0` and `net10.0`, so `dotnet build` builds three times
-over and `dotnet test` runs the suite once per framework — pass `--framework` (or `-f`) to
-pick one.
+Everything targets `net8.0` and `net10.0`, so `dotnet build` builds twice over and
+`dotnet test` runs a suite once per framework — pass `--framework` (or `-f`) to pick one.
+
+The build is strict: every warning is an error, the `.editorconfig` style rules are enforced,
+and NuGet's vulnerability audit fails the restore when any dependency, direct or transitive,
+has a moderate or worse advisory.
 
 ## What CI checks
 
-| Check | What it enforces |
-|---|---|
-| `build` | Builds the solution for every supported framework and runs the unit tests on each |
-| `integration (MsSql)` | The full behaviour suite against SQL Server, on .NET 8, 9 and 10 |
-| `integration (PostgreSql)` | The full behaviour suite against PostgreSQL, on .NET 8, 9 and 10 |
-| `integration (MySql)` | The full behaviour suite against MySQL, on .NET 8, 9 and 10 |
-| `PR title and description` | The title follows Conventional Commits; the description is filled in |
+| Check | What it enforces | Required |
+|---|---|---|
+| `build` | Linux: builds every framework, runs the unit tests on each with coverage, packs (package validation) | yes |
+| `build (windows)` | The same build and unit tests on Windows (CRLF, path separators) | no |
+| `integration (MsSql)` | The full behaviour suite against SQL Server, on .NET 8 and 10 | yes |
+| `integration (PostgreSql)` | The full behaviour suite against PostgreSQL, on .NET 8 and 10 | yes |
+| `integration (MySql)` | The full behaviour suite against MySQL, on .NET 8 and 10 | yes |
+| `PR title and description` | The title follows Conventional Commits; the description is filled in | no |
+| `analyze (csharp)`, `analyze (actions)` | CodeQL security and quality queries | no |
 
-All of them are required before a pull request can merge. The engine jobs run in parallel
-and report separately, so a failure in one engine does not hide the others.
+The required checks block the merge. The engine jobs run in parallel and report separately,
+so a failure in one engine does not hide the others. Workflow actions are pinned to a commit
+SHA; Dependabot proposes the updates.
 
 ## Writing the pull request
 
@@ -102,12 +108,16 @@ The rest of the protection on `main` is not optional:
 ## Releasing
 
 A release is a tag plus a GitHub release. The `Publish` workflow runs on the published
-release and pushes every package to nuget.org.
+release, builds and unit-tests the tagged commit, and pushes every package (and its `.snupkg`
+symbols) to nuget.org.
 
 ```bash
-# The version in Directory.Build.props is the version that gets published.
-gh release create v0.1.0 --generate-notes
+# The tag is the version: v0.2.0 publishes 0.2.0. No file in the repository holds a version;
+# a local build is 0.0.0-dev.
+gh release create v0.2.0 --notes-file <(sed -n '/^## \[0.2.0\]/,/^## \[/p' CHANGELOG.md | sed '$d')
 ```
+
+Move the `Unreleased` section of [CHANGELOG.md](CHANGELOG.md) under the new version first.
 
 The workflow publishes through **trusted publishing**: GitHub mints an OIDC token, nuget.org
 checks it against the policy registered for this repository and hands back a key that lives
@@ -131,12 +141,16 @@ A new policy starts in a **seven-day pending state** and becomes permanent after
 successful publish. If seven days pass without one, the policy goes inactive and nuget.org
 offers an *Activate for 7 days* button on the policy.
 
-If a publish fails half way, run the `Publish` workflow by hand from the `main` branch.
+If a publish fails half way, run the `Publish` workflow by hand and give it the release tag.
 The push uses `--skip-duplicate`, so the packages that already landed do not fail the run.
+
+After the first release of a version line, set `PackageValidationBaselineVersion` in
+`src/Directory.Build.props` to it: from then on `dotnet pack` fails when the public API
+breaks compatibility with that release.
 
 ## Ground rules
 
-**The engine interface is the abstraction boundary.** If a test needs to know which engine it
+**The engine base class is the abstraction boundary.** If a test needs to know which engine it
 is running on, the abstraction has a hole. Raw DDL is the one legitimate exception — the
 three dialects genuinely differ — so dialect-specific DDL belongs in the engine's test
 class, and the assertions stay in the shared base class.
@@ -154,10 +168,13 @@ caller can log or fail on it.
 
 ## Adding an engine
 
-1. Add `src/DbTest.<Name>` implementing `IDbEngine`.
+1. Add `src/DbTest.<Name>` with a class deriving from `DbEngine`.
 2. Add the engine to `EngineRegistration.RegisterBuiltins()` in the CLI.
-3. Add a schema under `tests/DbTest.Integration.Tests/Schema/<name>/`.
-4. Add a test class deriving from `HarnessBehaviourTestsBase`.
+3. Add a schema under `tests/DbTest.Integration.Tests/Schema/<name>/`, including the
+   `customers`, `orders` and `audit_entries` tables and the `customer_order_total` routine.
+4. Add a `[TestClass]` deriving from `HarnessBehaviourTestsBase` that overrides
+   `CreateEngine`, `SchemaDirectory` and the two probe-column statements.
+5. Add the engine to the `integration` matrix in `.github/workflows/ci.yml`.
 
 The shared test body must pass unchanged. If it does not, the difference is either a bug in
 the engine or a real dialect difference — in which case the dialect-specific part belongs in
@@ -165,14 +182,18 @@ the engine's own test class, and the shared assertion stays shared.
 
 ## Dependencies
 
-- Supported runtimes: `net8.0`, `net9.0` and `net10.0`. The list lives in
-  `DbTestTargetFrameworks` in `Directory.Build.props`; every project targets all of them,
-  so a change to that list changes what CI builds and runs.
+- Supported runtimes: `net8.0` (the floor) and `net10.0`. .NET 9 consumers resolve the
+  `net8.0` asset. The list lives in `DbTestTargetFrameworks` in `Directory.Build.props`;
+  every project targets all of it, so a change to that list changes what CI builds and runs.
 - Building the repository needs the .NET 10 SDK — `global.json` pins it, because targeting
   `net10.0` needs an SDK that new. Consuming the packages needs only .NET 8 or newer.
 - `Microsoft.Data.SqlClient` does **not** work under globalization invariant mode. Do not
   enable `InvariantGlobalization` in `Directory.Build.props`.
-- `MySqlConnector` must stay at 2.6.1 or later (GHSA-473q-m89c-ghf8).
+- `MySqlConnector` must stay at 2.6.1 or later (GHSA-473q-m89c-ghf8), and the
+  Testcontainers packages at 4.16.0 or later (they bring a patched SSH.NET).
+- `System.Security.Cryptography.Pkcs` is pinned in `Directory.Packages.props` because every
+  `Microsoft.Data.SqlClient` release still depends on a vulnerable version. The comment there
+  says when the pin can go.
 - `NuGet.config` clears inherited sources on purpose: this is a public repository and must
   not restore from private feeds.
 

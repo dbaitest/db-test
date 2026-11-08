@@ -15,37 +15,46 @@ every database test suite hits and that most teams solve by hand, badly:
 |---|---|
 | Where does the test database come from? | A throwaway container per engine, started and destroyed by the harness. Nothing touches a shared or staging database. |
 | How does the schema get there? | Schema files on disk, applied in order, with the engine's own splitting rules (`GO` batches, dollar-quoted bodies, `DELIMITER` directives). |
-| A test dropped a table and the next test failed on a missing object | The **shape guard** snapshots every object after the schema is applied and names the class that changed the shape. |
-| One test's rows leaked into the next | `Clean()` empties every table in foreign-key order and resets identity counters. |
+| A test dropped a table and the next test failed on a missing object | The **shape guard** snapshots every object after the schema is applied and fails the test that changed the shape. |
+| One test's rows leaked into the next | `CleanAsync()` empties every table whatever the foreign keys and resets identity counters to their seed. |
 | "The suite is slow" | Optional per-test timing output (`DBTEST_TIMING=1`). |
-| The same assertions written three times | The engine is behind an interface; the test body never mentions one. |
+| The same assertions written three times | The engine is behind one abstract class; the test body never mentions one. |
 
 ## 2. Architecture
 
 ```
-src/DbTest.Core          engine-agnostic: schema loading, statement splitting,
-                         the harness, the shape guard, diagnostics
+src/DbTest.Core          engine-agnostic: the DbEngine base class, schema loading,
+                         statement splitting, the harness, the shape guard, diagnostics
+src/DbTest.MSTest        DbTestBase / DbTestRun: shared harness per engine, shape guard
+                         after every test, timings
 src/DbTest.MsSql         SQL Server engine
 src/DbTest.PostgreSql    PostgreSQL engine
 src/DbTest.MySql         MySQL engine
 src/DbTest.Cli           the `dbtest` command
+tests/DbTest.Core.Tests  unit tests: splitters, scalar conversion, loader, guard,
+                         diagnostics, CLI parsing — no Docker
 tests/DbTest.Integration.Tests
-                         one shared test body, run against all three engines,
-                         plus unit tests for the statement splitter
+                         one shared test body, built on DbTest.MSTest, run against all
+                         three engines
 ```
 
 ### The engine contract
 
-`IDbEngine` (in `DbTest.Core`) is the whole surface an engine has to implement:
+`DbEngine` (in `DbTest.Core`) is an abstract class. An engine implements only what is
+genuinely engine-specific:
 
+- its name and default image, and a connection factory;
 - start a container and hand back a connection string;
-- apply schema scripts;
+- split one schema file into the commands the server accepts;
 - list the objects the database holds (name, kind, columns);
-- empty every table;
-- run a statement, run a query.
+- empty every table and reset identities.
 
-Everything else — schema discovery, ordering, exclusion, the shape guard, cleanup policy —
-lives in the core and is identical across engines.
+Applying a schema (collecting every failing file), running statements, binding parameters
+and converting scalars are inherited. Schema discovery, ordering, exclusion and the shape
+guard live in the core and are identical across engines.
+
+It is an abstract class rather than an interface so that a capability added later arrives as
+a virtual member with a default, without breaking an engine written outside this repository.
 
 This is the single most important decision in the project. The three engines disagree on
 almost everything, and each disagreement used to be a special case in test code:
@@ -62,40 +71,52 @@ almost everything, and each disagreement used to be a special case in test code:
 
 `SchemaShapeGuard` is the piece worth porting from the internal PMI harness. A shared
 container means a shared schema; a test that drops or re-types a table leaves the next test
-failing for the wrong reason. The guard snapshots every object after the schema is applied,
-re-reads it after each test class, and reports:
+failing for the wrong reason. The guard snapshots every object after the schema is applied;
+`DbTestBase` re-reads it after every test and fails the test that changed one:
 
 ```
-[ShapeGuard] ShapeGuardProbeTests left customers columns changed (id,email,...) -> (id,email,...,dbtest_shape_probe)
+[ShapeGuard] CustomerTests.Adds_A_Column left public.customers columns changed (id,email,...) -> (id,email,...,dbtest_shape_probe)
 ```
+
+Each damaged object is blamed once, on the first test that saw it damaged; an object put
+back into shape is forgotten, so a later test that breaks it again is blamed again.
 
 It detects and blames. It does not repair: a silent repair hides the leak from the next run,
 and the next run is exactly when you want to see it.
 
 ## 3. What was built and verified
 
-- `DbTest.Core` — schema loader, statement splitter (three engine rule sets), harness,
-  shape guard, timing diagnostics, engine registry.
+- `DbTest.Core` — the `DbEngine` base class, schema loader, statement splitters (`GO`
+  batches, `DELIMITER`), scalar conversion, harness, shape guard, timing diagnostics, engine
+  registry.
+- `DbTest.MSTest` — `DbTestBase` and `DbTestRun`.
 - `DbTest.MsSql`, `DbTest.PostgreSql`, `DbTest.MySql` — one engine each.
 - `DbTest.Cli` — `dbtest engines`, `dbtest up`, `dbtest schema`.
+- Unit tests — splitters, scalar conversion, loader ordering and exclusion, shape guard,
+  diagnostics, CLI parsing, registry.
 - Integration tests — one shared test body asserting container startup, schema application,
-  seeding, cleanup with identity reset, foreign-key enforcement, and shape-guard detection,
-  executed against all three engines.
+  seeding, cleanup with identity reset (including a table that never held a row), nullable
+  and cross-driver scalar conversion, foreign-key enforcement, and shape-guard detection,
+  executed against all three engines through `DbTest.MSTest`.
 
-**Verification: 24/24 tests pass in Release from a clean tree**, on Windows with Docker
-Desktop 29.7.2 and .NET SDK 10.0.301. The suite is 18 integration tests (6 behaviour tests ×
-3 engines) plus 6 statement-splitter unit tests.
+**Verification (0.2.0): 154/154 tests pass in Release from a clean tree**, on Windows with
+Docker Desktop 29.7.2 and .NET SDK 10.0.301: 53 unit tests and 24 integration tests (8
+behaviour tests × 3 engines), each run on net8.0 and on net10.0. Two mutation checks back the
+new tests: restoring the old `RESEED, 0` makes the never-used-table test fail with id 0, and
+a test that leaves a column added fails in its own cleanup while the next test passes.
 
 ### Supported runtimes
 
-The packages target `net8.0`, `net9.0` and `net10.0`. `DbTestTargetFrameworks` in
-`Directory.Build.props` holds that list, and every project — the libraries, the CLI and
-the suite — targets all of it. A consumer on .NET 8 resolves the `net8.0` asset; a consumer
-on a newer runtime resolves the one that matches it.
+The packages target `net8.0` (the floor) and `net10.0` (the primary target); both are LTS.
+`DbTestTargetFrameworks` in `Directory.Build.props` holds that list, and every project — the
+libraries, the CLI and the suites — targets all of it. A consumer on .NET 8 or 9 resolves the
+`net8.0` asset; a consumer on .NET 10 or later resolves the `net10.0` one. The `net9.0`
+target was dropped in 0.2.0: .NET 9 is an STS release, and its consumers lose nothing by
+resolving `net8.0`.
 
 Two mechanisms make "net8.0 or newer" true rather than nominal:
 
-- `RollForward=Major` in the runtime configuration of the CLI and of the test host. A build
+- `RollForward=Major` in the runtime configuration of the CLI and of the test hosts. A build
   for .NET 8 runs on .NET 9, 10 and later when the .NET 8 runtime is not installed; without
   it, a machine with only .NET 10 refuses to start the .NET 8 test host.
 - The CI matrix runs the behaviour suite on each runtime, and the unit tests run once per
@@ -115,6 +136,9 @@ core, and each is worth knowing before writing another engine.
 | `pg_class.relkind` is `char` | Npgsql refuses to read a `char` column as `System.String` | `relkind::text` |
 | Routines live outside the relation catalog | `pg_class` has no procedures; `information_schema.tables` has no MySQL routines | A second query per engine (`pg_proc`, `information_schema.routines`) |
 | `DBCC CHECKIDENT` takes a quoted, comma-separated name | `DBCC CHECKIDENT ([dbo].[t]) RESEED WITH 0` is a syntax error | `DBCC CHECKIDENT ('[dbo].[t]', RESEED, 0)` |
+| `DBCC CHECKIDENT … RESEED, n` depends on history | The next id is `n + increment` if the table ever held a row, but `n` itself if it never did — so reseeding to 0 gave a never-used table a first id of 0 | Reseed to `seed` when `sys.identity_columns.last_value` is NULL, else to `seed − increment` |
+| `delimiter` is not reserved in MySQL | A line-based `DELIMITER` match turned a column named `delimiter_char` into a directive | A scanner that only accepts the directive between statements |
+| Testcontainers' and SqlClient's transitive dependencies | SSH.NET and System.Security.Cryptography.Pkcs shipped with high-severity advisories | NuGetAudit as an error; Testcontainers 4.16; a CPM pin for Pkcs |
 | SQL Server's `sa` password policy | A simple password fails the container at startup, not at first login | The MSSQL engine owns a policy-compliant default |
 | Globalization invariant mode | `Microsoft.Data.SqlClient` refuses to run under it | `InvariantGlobalization` is deliberately off, with a comment saying why |
 | `SqlDataReader.GetChar` | Not supported by SqlClient | Cast in SQL instead |
@@ -167,7 +191,7 @@ seed fixture (with the date dimension that keeps biting) is worth adding.
 
 ## 5. Design rules to keep
 
-1. **The engine interface is the whole abstraction boundary.** If a test needs to know which
+1. **The engine base class is the whole abstraction boundary.** If a test needs to know which
    engine it is on, the abstraction has a hole.
 2. **The shape guard detects, it does not repair.** A silent repair hides the leak.
 3. **A schema that only partly applied must fail loudly at setup**, not surface later as

@@ -1,9 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>$(DbTestTargetFrameworks)</TargetFrameworks>
     <Description>PostgreSQL engine for DbTest: container lifecycle, dollar-quote-safe schema application and Postgres introspection.</Description>
-    <IsPackable>true</IsPackable>
     <PackageId>DbTest.PostgreSql</PackageId>
     <RootNamespace>DbTest.PostgreSql</RootNamespace>
   </PropertyGroup>
@@ -11,10 +9,6 @@
   <ItemGroup>
     <PackageReference Include="Npgsql" />
     <PackageReference Include="Testcontainers.PostgreSql" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
 
   <ItemGroup>

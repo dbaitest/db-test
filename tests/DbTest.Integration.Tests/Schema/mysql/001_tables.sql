@@ -18,3 +18,19 @@ CREATE TABLE IF NOT EXISTS orders (
     KEY ix_orders_customer_id (customer_id),
     CONSTRAINT fk_orders_customer FOREIGN KEY (customer_id) REFERENCES customers (id)
 );
+
+-- A table no test seeds, so the first row it ever receives proves that Clean reset the
+-- identity of a table that never held a row: SQL Server hands such a table the reseed
+-- value itself, so a reseed to 0 made its first id 0 instead of 1.
+CREATE TABLE IF NOT EXISTS audit_entries (
+    id   INT NOT NULL AUTO_INCREMENT,
+    note VARCHAR(200) NOT NULL,
+    PRIMARY KEY (id)
+);
+
+-- References audit_entries, so Clean must empty it despite the foreign key.
+CREATE TABLE IF NOT EXISTS audit_entry_tags (
+    audit_entry_id INT NOT NULL,
+    tag            VARCHAR(50) NOT NULL,
+    CONSTRAINT fk_audit_entry_tags_entry FOREIGN KEY (audit_entry_id) REFERENCES audit_entries (id)
+);

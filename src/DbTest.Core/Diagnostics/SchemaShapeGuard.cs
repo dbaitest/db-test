@@ -1,3 +1,5 @@
+using System.Data.Common;
+
 using DbTest.Core.Engine;
 using DbTest.Core.Schema;
 
@@ -11,8 +13,8 @@ namespace DbTest.Core.Diagnostics;
 /// This is the single most valuable thing in an integration suite that shares one container:
 /// without it, one test that drops a table leaves the next test failing on a missing object,
 /// and the failure points at the victim rather than the culprit. The guard snapshots every
-/// object after the schema is applied and re-reads it after each test class, then names the
-/// class that changed the shape.
+/// object after the schema is applied and re-reads it after each test (DbTest.MSTest does this
+/// automatically), then names the test that changed the shape.
 /// </para>
 /// <para>
 /// Detection only. The guard reports what changed and who changed it; it does not repair,
@@ -21,34 +23,43 @@ namespace DbTest.Core.Diagnostics;
 /// </remarks>
 public sealed class SchemaShapeGuard
 {
-    private readonly IDbEngine _engine;
+    private readonly DbEngine _engine;
     private readonly IReadOnlyDictionary<string, SchemaObject> _baseline;
-    private readonly HashSet<string> _reported;
+    private readonly HashSet<string> _outstanding;
     private readonly List<SchemaShapeLeak> _leaks = [];
 
     /// <summary>Creates a guard over a baseline snapshot of the schema.</summary>
     /// <param name="engine">The engine to read the live schema through.</param>
     /// <param name="baseline">Objects as they were when the schema was applied.</param>
-    public SchemaShapeGuard(IDbEngine engine, IReadOnlyDictionary<string, SchemaObject> baseline)
+    public SchemaShapeGuard(DbEngine engine, IReadOnlyDictionary<string, SchemaObject> baseline)
     {
+        ArgumentNullException.ThrowIfNull(engine);
+        ArgumentNullException.ThrowIfNull(baseline);
+
         _engine = engine;
         _baseline = baseline;
-        _reported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        _outstanding = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     }
 
-    /// <summary>Leaks detected so far.</summary>
+    /// <summary>Every leak detected so far, in the order it was detected.</summary>
     public IReadOnlyList<SchemaShapeLeak> Leaks => _leaks;
 
     /// <summary>
-    /// Captures the current schema and reports every object whose shape differs from the baseline.
+    /// Captures the current schema and reports every object whose shape newly differs from the
+    /// baseline.
     /// </summary>
+    /// <remarks>
+    /// Each damaged object is reported once, against the first caller that saw it damaged: that
+    /// is the culprit, and later callers only inherited the damage. An object that is put back
+    /// into its baseline shape is forgotten, so a later test that breaks it again is blamed again.
+    /// </remarks>
     /// <param name="connection">An open connection to the database under test.</param>
-    /// <param name="responsibleClass">Name of the test class being blamed, usually the class that just ran.</param>
+    /// <param name="responsible">The test (or test class) being blamed, usually the one that just ran.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The leaks found in this pass.</returns>
+    /// <returns>The leaks first detected in this pass.</returns>
     public async Task<IReadOnlyList<SchemaShapeLeak>> CheckAsync(
-        System.Data.Common.DbConnection connection,
-        string responsibleClass,
+        DbConnection connection,
+        string responsible,
         CancellationToken cancellationToken = default)
     {
         var current = await CaptureAsync(connection, cancellationToken).ConfigureAwait(false);
@@ -58,7 +69,7 @@ public sealed class SchemaShapeGuard
         {
             if (!current.TryGetValue(name, out var live))
             {
-                found.Add(new SchemaShapeLeak(name, baselineObject.Kind, "dropped", responsibleClass));
+                found.Add(new SchemaShapeLeak(name, baselineObject.Kind, "dropped", responsible));
                 continue;
             }
 
@@ -68,7 +79,7 @@ public sealed class SchemaShapeGuard
                     name,
                     baselineObject.Kind,
                     $"re-typed ({baselineObject.Kind} -> {live.Kind})",
-                    responsibleClass));
+                    responsible));
                 continue;
             }
 
@@ -77,27 +88,22 @@ public sealed class SchemaShapeGuard
                 found.Add(new SchemaShapeLeak(
                     name,
                     baselineObject.Kind,
-                    $"columns changed ({Describe(baselineObject.Columns)} -> {Describe(live.Columns)})",
-                    responsibleClass));
+                    $"columns changed ({Describe(baselineObject.Columns)}) -> ({Describe(live.Columns)})",
+                    responsible));
             }
         }
 
-        foreach (var leak in found)
-        {
-            // Report each object once. The first class to change it is the culprit; later
-            // classes only inherited the damage and reporting them would dilute the signal.
-            if (_reported.Add(leak.ObjectName))
-            {
-                _leaks.Add(leak);
-            }
-        }
+        // Forget objects that were repaired, so breaking them again is reported again.
+        _outstanding.RemoveWhere(name => found.All(l => !string.Equals(l.ObjectName, name, StringComparison.OrdinalIgnoreCase)));
 
-        return found;
+        var fresh = found.Where(leak => _outstanding.Add(leak.ObjectName)).ToList();
+        _leaks.AddRange(fresh);
+        return fresh;
     }
 
     /// <summary>Captures the live shape of every object the engine can see.</summary>
     public async Task<IReadOnlyDictionary<string, SchemaObject>> CaptureAsync(
-        System.Data.Common.DbConnection connection,
+        DbConnection connection,
         CancellationToken cancellationToken = default)
     {
         var objects = await _engine.ListObjectsAsync(connection, cancellationToken).ConfigureAwait(false);
@@ -114,13 +120,13 @@ public sealed class SchemaShapeGuard
 /// <param name="ObjectName">Qualified name of the object.</param>
 /// <param name="Kind">What kind of object it was.</param>
 /// <param name="Change">What changed, in words.</param>
-/// <param name="ResponsibleClass">The test class blamed for the change.</param>
+/// <param name="Responsible">The test (or test class) blamed for the change.</param>
 public sealed record SchemaShapeLeak(
     string ObjectName,
     SchemaObjectKind Kind,
     string Change,
-    string ResponsibleClass)
+    string Responsible)
 {
     /// <inheritdoc />
-    public override string ToString() => $"[ShapeGuard] {ResponsibleClass} left {ObjectName} {Change}";
+    public override string ToString() => $"[ShapeGuard] {Responsible} left {ObjectName} {Change}";
 }

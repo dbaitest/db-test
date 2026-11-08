@@ -28,3 +28,25 @@ BEGIN
     CREATE INDEX ix_orders_customer_id ON dbo.orders (customer_id);
 END;
 GO
+
+-- A table no test seeds, so the first row it ever receives proves that Clean reset the
+-- identity of a table that never held a row: SQL Server hands such a table the reseed
+-- value itself, so a reseed to 0 made its first id 0 instead of 1.
+IF OBJECT_ID('dbo.audit_entries', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.audit_entries (
+        id   INT IDENTITY(1,1) NOT NULL CONSTRAINT pk_audit_entries PRIMARY KEY,
+        note NVARCHAR(200) NOT NULL
+    );
+END;
+GO
+
+-- References audit_entries, so Clean must DELETE it and reseed rather than TRUNCATE it.
+IF OBJECT_ID('dbo.audit_entry_tags', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.audit_entry_tags (
+        audit_entry_id INT NOT NULL CONSTRAINT fk_audit_entry_tags_entry FOREIGN KEY REFERENCES dbo.audit_entries (id),
+        tag            NVARCHAR(50) NOT NULL
+    );
+END;
+GO

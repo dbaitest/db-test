@@ -1,0 +1,30 @@
+# Keeps the NuGet packages and the SHA-pinned GitHub Actions up to date. Updates are grouped
+# so a week of bumps arrives as one pull request per ecosystem, not a dozen; security
+# updates are not grouped and arrive as soon as an advisory is published.
+version: 2
+
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build(deps)
+    groups:
+      testcontainers:
+        patterns: ["Testcontainers*"]
+      mstest:
+        patterns: ["MSTest*", "Microsoft.NET.Test.Sdk", "coverlet*"]
+      drivers:
+        patterns: ["Microsoft.Data.SqlClient", "Npgsql", "MySqlConnector"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci(deps)
+    groups:
+      actions:
+        patterns: ["*"]

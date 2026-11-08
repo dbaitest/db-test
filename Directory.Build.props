@@ -9,54 +9,62 @@
       refuses to run under it ("Globalization Invariant Mode is not supported"), so the SQL
       Server engine would fail at the first connection.
     -->
-    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
-    <NoWarn>$(NoWarn);NU1900</NoWarn>
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <Product>DbTest</Product>
-    <Authors>dbaitest</Authors>
-    <Company>dbaitest</Company>
-    <Copyright>Copyright (c) dbaitest contributors</Copyright>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <RepositoryType>git</RepositoryType>
-    <RepositoryUrl>https://github.com/dbaitest/db-test</RepositoryUrl>
-    <PackageProjectUrl>https://github.com/dbaitest/db-test</PackageProjectUrl>
-    <PackageTags>dotnet;database;testing;integration-tests;testcontainers;sqlserver;postgresql;mysql;mstest</PackageTags>
-    <!-- The README ships inside the package, so nuget.org shows it on the package page. -->
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-    <VersionPrefix>0.1.0</VersionPrefix>
   </PropertyGroup>
 
   <!--
-    The supported runtime range. net8.0 is the floor: every package ships a net8.0 asset,
-    so a consumer on .NET 8 or on any newer runtime resolves an asset that fits. Each
-    project targets every framework in this list, so the libraries are compiled — and the
-    suites are run — against every one of them.
+    Code quality gates. Every warning fails the build, the .editorconfig style rules are
+    enforced at build time, and the default .NET analyzer set runs at the latest level.
+    GenerateDocumentationFile is on everywhere because IDE0005 (unnecessary usings) only
+    runs at build time when it is; test projects silence the missing-doc warning instead.
+  -->
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!--
+    Dependency audit. NuGet checks every package, direct and transitive, against the GitHub
+    advisory database on restore; a moderate, high or critical advisory fails the build.
+  -->
+  <PropertyGroup>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>moderate</NuGetAuditLevel>
+    <WarningsAsErrors>$(WarningsAsErrors);NU1902;NU1903;NU1904</WarningsAsErrors>
+  </PropertyGroup>
+
+  <!--
+    The supported runtime range: net8.0 is the floor, net10.0 the primary target. Both are
+    LTS releases. A consumer on .NET 8 resolves the net8.0 asset; a consumer on .NET 9 also
+    resolves the net8.0 asset (it is compatible); a consumer on .NET 10 or later resolves the
+    net10.0 asset. Each project targets every framework in this list, so the libraries are
+    compiled — and the suites are run — against every one of them.
 
     Adding a framework here means: a matching runtime in the CI matrix, a matching entry
     in the README requirements, and a build that needs an SDK new enough to target it.
   -->
   <PropertyGroup>
-    <DbTestTargetFrameworks>net8.0;net9.0;net10.0</DbTestTargetFrameworks>
+    <DbTestTargetFrameworks>net8.0;net10.0</DbTestTargetFrameworks>
   </PropertyGroup>
 
   <!--
-    Roll-forward for the executables this repository produces (the CLI and the test host).
-    A net8.0 build must also run on .NET 9, 10, 11 and later when the floor runtime is
-    not installed. "Major" keeps the floor when it is there and moves up to the next
-    available major version when it is not — so a machine with only .NET 10 still runs
-    the suite, and a machine with .NET 8 still runs it on .NET 8.
+    Roll-forward for the executables this repository produces (the CLI and the test hosts).
+    "Major" keeps the floor runtime when it is installed and moves up to the next available
+    major version when it is not — so a machine with only .NET 10 still runs the net8.0
+    build, and a machine with .NET 8 still runs it on .NET 8.
   -->
   <PropertyGroup>
     <RollForward>Major</RollForward>
   </PropertyGroup>
 
   <!--
-    net8.0 and net9.0 are past their support window; the floor is a deliberate choice,
-    not an accident, so the EOL warning is not useful here.
+    net8.0 leaves support on 2026-11-10. Keeping it as the floor is a deliberate choice, so
+    the SDK's end-of-life warning (which would fail the build under TreatWarningsAsErrors)
+    is switched off rather than left to break every build after that date.
   -->
   <PropertyGroup>
     <CheckEolTargetFramework>false</CheckEolTargetFramework>

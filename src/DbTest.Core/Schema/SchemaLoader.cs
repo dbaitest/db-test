@@ -9,10 +9,11 @@ namespace DbTest.Core.Schema;
 /// <remarks>
 /// <para>
 /// Ordering matters: the schema is applied file by file, so a file that references an
-/// object created by an earlier file must come later. Files are ordered by directory
-/// depth (shallow first) and then alphabetically within a directory, which puts
-/// <c>tables</c> before <c>procedures</c> only if the author names them that way — the
-/// <see cref="SchemaLoadOptions.OrderedDirectories"/> option exists for that.
+/// object created by an earlier file must come later. Files are ordered by their relative
+/// path (ordinal, case-insensitive), so <c>001_tables.sql</c> runs before
+/// <c>002_procedures.sql</c> and <c>procedures/</c> runs before <c>tables/</c> unless
+/// <see cref="SchemaLoadOptions.OrderedDirectories"/> says otherwise. Name numbered files with
+/// leading zeros: <c>10_x.sql</c> sorts before <c>2_x.sql</c>.
 /// </para>
 /// <para>
 /// Exclusion is by convention, and every rule is overridable. Excluding a file by name
@@ -25,12 +26,16 @@ public static class SchemaLoader
     /// <summary>Extensions treated as SQL source, in the order they are probed.</summary>
     private static readonly string[] SqlExtensions = [".sql", ".psql"];
 
+    /// <summary>A file-name pattern that takes longer than this is a broken pattern, not a slow one.</summary>
+    private static readonly TimeSpan PatternTimeout = TimeSpan.FromSeconds(1);
+
     /// <summary>Loads the schema rooted at <paramref name="rootDirectory"/>.</summary>
     /// <param name="rootDirectory">Directory that holds the schema files.</param>
     /// <param name="options">Load options. Defaults are used when omitted.</param>
     /// <exception cref="DirectoryNotFoundException">The root directory does not exist.</exception>
     public static SchemaLoadResult Load(string rootDirectory, SchemaLoadOptions? options = null)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(rootDirectory);
         options ??= new SchemaLoadOptions();
 
         var root = Path.GetFullPath(rootDirectory);
@@ -98,27 +103,29 @@ public static class SchemaLoader
     private static bool IsExcludedByFileName(string relativePath, SchemaLoadOptions options)
     {
         var name = Path.GetFileName(relativePath);
-        return options.ExcludedFileNamePatterns.Any(pattern => Regex.IsMatch(name, pattern, RegexOptions.IgnoreCase));
+        return options.ExcludedFileNamePatterns.Any(
+            pattern => Regex.IsMatch(name, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, PatternTimeout));
     }
 
     private static List<SchemaScript> Order(List<SchemaScript> scripts, SchemaLoadOptions options)
     {
-        var ordered = new List<SchemaScript>(scripts.Count);
+        // A file's rank is the position of the first ordered directory it lives in (that
+        // directory or below it); files outside every ordered directory come last. Within a
+        // rank, files keep their path order.
+        var prefixes = options.OrderedDirectories
+            .Select(d => d.Replace('\\', '/').Trim('/') + "/")
+            .ToList();
 
-        // Explicit directory order first, then everything else.
-        foreach (var directory in options.OrderedDirectories)
+        int Rank(SchemaScript script)
         {
-            ordered.AddRange(scripts
-                .Where(s => string.Equals(s.RelativeDirectory, directory, StringComparison.OrdinalIgnoreCase))
-                .OrderBy(s => s.RelativePath, StringComparer.OrdinalIgnoreCase));
+            var index = prefixes.FindIndex(p => script.RelativePath.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+            return index < 0 ? prefixes.Count : index;
         }
 
-        ordered.AddRange(scripts
-            .Where(s => !options.OrderedDirectories
-                .Any(d => string.Equals(s.RelativeDirectory, d, StringComparison.OrdinalIgnoreCase)))
-            .OrderBy(s => s.RelativePath, StringComparer.OrdinalIgnoreCase));
-
-        return ordered;
+        return scripts
+            .OrderBy(Rank)
+            .ThenBy(s => s.RelativePath, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 }
 
@@ -131,7 +138,10 @@ public sealed class SchemaLoadOptions
     /// <summary>Regular expressions matched against the file name; a match excludes the file.</summary>
     public IList<string> ExcludedFileNamePatterns { get; init; } = [];
 
-    /// <summary>Directories applied in this exact order, before any other directory.</summary>
+    /// <summary>
+    /// Directories (relative to the schema root) applied in this exact order, before any other
+    /// file. A directory includes its subdirectories.
+    /// </summary>
     public IList<string> OrderedDirectories { get; init; } = [];
 }
 

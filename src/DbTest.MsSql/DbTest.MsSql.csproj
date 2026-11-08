@@ -1,9 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>$(DbTestTargetFrameworks)</TargetFrameworks>
     <Description>SQL Server engine for DbTest: container lifecycle, GO-batch schema application and SQL Server introspection.</Description>
-    <IsPackable>true</IsPackable>
     <PackageId>DbTest.MsSql</PackageId>
     <RootNamespace>DbTest.MsSql</RootNamespace>
   </PropertyGroup>
@@ -11,10 +9,6 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.SqlClient" />
     <PackageReference Include="Testcontainers.MsSql" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
 
   <ItemGroup>
