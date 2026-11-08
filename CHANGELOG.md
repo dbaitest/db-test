@@ -7,6 +7,8 @@ may break the API, and the breaking changes are listed first.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-08
+
 ### Added
 
 - **`DbTest.MsSql.Dacpac`**, a new package: `DacpacSchemaSource` deploys a SQL Server `.dacpac`
@@ -115,6 +117,7 @@ may break the API, and the breaking changes are listed first.
 First release: `DbTest.Core`, the SQL Server, PostgreSQL and MySQL engines, and the `dbtest`
 CLI.
 
-[Unreleased]: https://github.com/dbaitest/db-test/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/dbaitest/db-test/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/dbaitest/db-test/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/dbaitest/db-test/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/dbaitest/db-test/releases/tag/v0.1.0
