@@ -112,8 +112,8 @@ release, builds and unit-tests the tagged commit, and pushes every package (and 
 symbols) to nuget.org.
 
 ```bash
-# The tag is the version: v0.2.0 publishes 0.2.0. No file in the repository holds a version;
-# a local build is 0.0.0-dev.
+# The tag is the version: v0.2.0 publishes 0.2.0. No file holds the release version;
+# a local build is <last release>-dev (see PackageValidationBaselineVersion).
 gh release create v0.2.0 --notes-file <(sed -n '/^## \[0.2.0\]/,/^## \[/p' CHANGELOG.md | sed '$d')
 ```
 
@@ -144,9 +144,11 @@ offers an *Activate for 7 days* button on the policy.
 If a publish fails half way, run the `Publish` workflow by hand and give it the release tag.
 The push uses `--skip-duplicate`, so the packages that already landed do not fail the run.
 
-After the first release of a version line, set `PackageValidationBaselineVersion` in
-`src/Directory.Build.props` to it: from then on `dotnet pack` fails when the public API
-breaks compatibility with that release.
+`PackageValidationBaselineVersion` in `src/Directory.Build.props` names the last release:
+`dotnet pack` (and so the `build` check) fails when the public API breaks compatibility with
+it. After each release, raise it to the new version; a deliberate breaking change raises it
+in the same pull request. A package published for the first time has no baseline yet, so
+release it once before its ID is validated.
 
 ## Ground rules
 
