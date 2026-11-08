@@ -7,6 +7,12 @@ may break the API, and the breaking changes are listed first.
 
 ## [Unreleased]
 
+### Changed
+
+- The package project URL points to the documentation site, https://dbaitest.com/db-test/,
+  instead of the GitHub repository. nuget.org shows it from the next release on. The README
+  links the site too.
+
 ## [0.3.0] - 2026-11-08
 
 ### Added

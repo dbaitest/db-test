@@ -3,6 +3,9 @@
 [![Build](https://github.com/dbaitest/db-test/actions/workflows/ci.yml/badge.svg)](https://github.com/dbaitest/db-test/actions/workflows/ci.yml)
 [![NuGet](https://img.shields.io/nuget/v/DbTest.Core.svg)](https://www.nuget.org/packages/DbTest.Core)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-dbaitest.com-0b7285.svg)](https://dbaitest.com/db-test/)
+
+**Documentation: [dbaitest.com/db-test](https://dbaitest.com/db-test/)** (English and Tiếng Việt)
 
 A .NET library for **database integration testing** that runs the same test body against
 **SQL Server, PostgreSQL and MySQL**.
