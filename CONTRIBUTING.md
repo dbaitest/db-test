@@ -119,6 +119,12 @@ gh release create v0.2.0 --notes-file <(sed -n '/^## \[0.2.0\]/,/^## \[/p' CHANG
 
 Move the `Unreleased` section of [CHANGELOG.md](CHANGELOG.md) under the new version first.
 
+After the packages are on nuget.org, open a PR in
+[dbaitest/dbaitest.com](https://github.com/dbaitest/dbaitest.com) that bumps the `db-test`
+`ref` in `projects.json` to the new tag. The site builds its docs from the README and samples
+at that tag, so until the bump it documents the previous release; its weekly build fails while
+the ref is behind the latest release.
+
 The workflow publishes through **trusted publishing**: GitHub mints an OIDC token, nuget.org
 checks it against the policy registered for this repository and hands back a key that lives
 for one hour. There is no API key in the repository and nothing to rotate.

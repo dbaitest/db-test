@@ -16,7 +16,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/dbaitest/db-test</RepositoryUrl>
-    <PackageProjectUrl>https://github.com/dbaitest/db-test</PackageProjectUrl>
+    <PackageProjectUrl>https://dbaitest.com/db-test/</PackageProjectUrl>
     <PackageReleaseNotes>https://github.com/dbaitest/db-test/blob/main/CHANGELOG.md</PackageReleaseNotes>
     <PackageTags>dotnet;database;testing;integration-tests;testcontainers;sqlserver;postgresql;mysql;mstest</PackageTags>
     <!-- The README ships inside the package, so nuget.org shows it on the package page. -->

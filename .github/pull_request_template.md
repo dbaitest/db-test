@@ -27,6 +27,7 @@ A change to a database engine needs its own proof on every engine it touches:
 - [ ] A behaviour change to a schema or an engine came with its test in the same commit
 - [ ] No engine-specific detail leaked into a shared test body
 - [ ] Public API changes are reflected in the README
+- [ ] A user-facing change has a docs PR in [dbaitest/dbaitest.com](https://github.com/dbaitest/dbaitest.com) (link it here), or needs none
 
 <!--
 Engine-specific detail in a shared test body is the one thing worth checking by
