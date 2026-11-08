@@ -13,6 +13,10 @@ on:
 permissions:
   contents: read
 
+# The unit tests load dacpacs through DacFx, which sends usage telemetry unless told not to.
+env:
+  DACFX_TELEMETRY_OPTOUT: "1"
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -64,6 +68,10 @@ jobs:
       - name: Pack
         run: dotnet pack --configuration Release --no-build --output artifacts -p:Version="$VERSION"
 
+      # Nothing but the src/ packages may reach nuget.org: a pushed version cannot be deleted.
+      - name: Check the packed set
+        run: .github/scripts/check-package-set.sh artifacts
+
       # Trusted publishing: GitHub mints the OIDC token, nuget.org checks it against the
       # policy registered for this repository and hands back a key that lives for one
       # hour. Nothing long-lived is stored in the repository. The key is minted right
@@ -101,7 +109,7 @@ jobs:
       # --skip-duplicate lets a re-run finish a publish that failed half way.
       - name: Push to nuget.org
         run: >-
-          dotnet nuget push "artifacts/*.nupkg"
+          dotnet nuget push "artifacts/DbTest.*.nupkg"
           --source https://api.nuget.org/v3/index.json
           --api-key "$NUGET_API_KEY"
           --skip-duplicate

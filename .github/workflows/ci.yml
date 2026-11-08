@@ -10,6 +10,11 @@ on:
 permissions:
   contents: read
 
+# DacFx (the unit tests, the SQL Server dacpac deploy, the sample's database project) sends
+# usage telemetry to Microsoft unless told not to.
+env:
+  DACFX_TELEMETRY_OPTOUT: "1"
+
 # A newer push to the same pull request makes the older run pointless.
 concurrency:
   group: ci-${{ github.ref }}
@@ -71,6 +76,11 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: dotnet pack --configuration Release --no-build --output artifacts
 
+      # One package per src/ project and nothing else: the release pushes what Pack produced.
+      - name: Check the packed set
+        if: matrix.os == 'ubuntu-latest'
+        run: .github/scripts/check-package-set.sh artifacts
+
   integration:
     runs-on: ubuntu-latest
     # The integration suite starts a container per engine. Running the three engines as
@@ -124,3 +134,31 @@ jobs:
           name: timings-${{ matrix.engine }}
           path: tests/DbTest.Integration.Tests/bin/Release/*/dbtest-timing.tsv
           if-no-files-found: ignore
+
+  # The SQL Server database project sample: builds the .sqlproj into a dacpac and runs its
+  # tests against the repository's own projects, so the documented pattern cannot rot. The
+  # samples have their own solution and are never part of DbTest.sln, which is what the
+  # release workflow builds and packs.
+  sample:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Restore
+        run: dotnet restore samples/MsSqlDacpac/MsSqlDacpac.slnx
+
+      - name: Build
+        run: dotnet build samples/MsSqlDacpac/MsSqlDacpac.slnx --configuration Release --no-restore
+
+      - name: Sample tests
+        run: >-
+          dotnet test samples/MsSqlDacpac/MsSqlDacpac.slnx
+          --configuration Release
+          --no-build
