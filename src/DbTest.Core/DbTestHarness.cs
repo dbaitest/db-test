@@ -61,32 +61,73 @@ public sealed class DbTestHarness : IAsyncDisposable
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A ready harness.</returns>
     /// <exception cref="SchemaApplyException">The schema failed to apply.</exception>
-    public static async Task<DbTestHarness> StartAsync(
+    public static Task<DbTestHarness> StartAsync(
         DbEngine engine,
         string? schemaRoot = null,
         DbContainerOptions? containerOptions = null,
         SchemaLoadOptions? loadOptions = null,
         CancellationToken cancellationToken = default)
     {
+        var source = string.IsNullOrEmpty(schemaRoot) ? null : new DirectorySchemaSource(schemaRoot, loadOptions);
+        return StartCoreAsync(engine, source, containerOptions, cancellationToken);
+    }
+
+    /// <summary>
+    /// Starts a container and puts a schema into it through a <see cref="SchemaSource"/> — a
+    /// directory of SQL files, a SQL Server <c>.dacpac</c>, or a source of your own.
+    /// </summary>
+    /// <param name="engine">The engine to start.</param>
+    /// <param name="schemaSource">The schema to apply.</param>
+    /// <param name="containerOptions">Container options, or null for the engine defaults.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A ready harness.</returns>
+    /// <exception cref="DbTestException">The source rejected the configuration; no container was started.</exception>
+    /// <exception cref="SchemaApplyException">The schema failed to apply.</exception>
+    public static Task<DbTestHarness> StartAsync(
+        DbEngine engine,
+        SchemaSource schemaSource,
+        DbContainerOptions? containerOptions = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(schemaSource);
+        return StartCoreAsync(engine, schemaSource, containerOptions, cancellationToken);
+    }
+
+    private static async Task<DbTestHarness> StartCoreAsync(
+        DbEngine engine,
+        SchemaSource? source,
+        DbContainerOptions? containerOptions,
+        CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(engine);
+
+        // Configuration mistakes surface before the image pull and the server boot.
+        source?.Validate(engine);
 
         var options = containerOptions ?? new DbContainerOptions();
         var container = await engine.StartContainerAsync(options, cancellationToken).ConfigureAwait(false);
 
+        // Everything after the container exists is inside the try, so a failure anywhere —
+        // the apply, the baseline read — removes the container instead of leaking it.
         try
         {
             IReadOnlyDictionary<string, SchemaObject> baseline =
                 new Dictionary<string, SchemaObject>(StringComparer.OrdinalIgnoreCase);
 
-            if (!string.IsNullOrEmpty(schemaRoot))
+            if (source is not null)
             {
-                var load = SchemaLoader.Load(schemaRoot, loadOptions);
+                var context = new SchemaApplyContext
+                {
+                    Engine = engine,
+                    ConnectionString = container.ConnectionString,
+                    Database = options.Database,
+                };
+
+                var apply = await source.ApplyAsync(context, cancellationToken).ConfigureAwait(false);
+                apply.ThrowIfFailed();
+
                 await using var connection = engine.CreateConnection(container.ConnectionString);
                 await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-
-                var apply = await engine.ApplySchemaAsync(connection, load.Scripts, cancellationToken)
-                    .ConfigureAwait(false);
-                apply.ThrowIfFailed();
 
                 var objects = await engine.ListObjectsAsync(connection, cancellationToken).ConfigureAwait(false);
                 baseline = objects.ToDictionary(o => o.QualifiedName, StringComparer.OrdinalIgnoreCase);

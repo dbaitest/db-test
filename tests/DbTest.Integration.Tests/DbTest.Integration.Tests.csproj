@@ -17,6 +17,7 @@
     <ProjectReference Include="..\..\src\DbTest.Core\DbTest.Core.csproj" />
     <ProjectReference Include="..\..\src\DbTest.MSTest\DbTest.MSTest.csproj" />
     <ProjectReference Include="..\..\src\DbTest.MsSql\DbTest.MsSql.csproj" />
+    <ProjectReference Include="..\..\src\DbTest.MsSql.Dacpac\DbTest.MsSql.Dacpac.csproj" />
     <ProjectReference Include="..\..\src\DbTest.PostgreSql\DbTest.PostgreSql.csproj" />
     <ProjectReference Include="..\..\src\DbTest.MySql\DbTest.MySql.csproj" />
   </ItemGroup>

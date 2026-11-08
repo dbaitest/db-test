@@ -1,0 +1,60 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>Sample.Database.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="MSTest" />
+  </ItemGroup>
+
+  <!--
+    In your own project these are package references instead:
+      dotnet add package DbTest.MSTest
+      dotnet add package DbTest.MsSql.Dacpac
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\DbTest.MSTest\DbTest.MSTest.csproj" />
+    <ProjectReference Include="..\..\..\src\DbTest.MsSql.Dacpac\DbTest.MsSql.Dacpac.csproj" />
+  </ItemGroup>
+
+  <!--
+    The database project. Referencing it makes `dotnet build` / `dotnet test` build the .dacpac
+    first; it is not an assembly, so nothing is referenced or copied by the reference itself.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\Sample.Database\Sample.Database.sqlproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true"
+                      Private="false" />
+  </ItemGroup>
+
+  <!--
+    Copy each referenced database project's .dacpac next to the test binaries, together with
+    every .dacpac beside it: the dacpacs it references (master.dacpac, another project's) are
+    resolved from the folder it is deployed from.
+  -->
+  <Target Name="CopyDacpacs" AfterTargets="Build">
+    <MSBuild Projects="@(ProjectReference)"
+             Condition="'%(Extension)' == '.sqlproj'"
+             Targets="GetTargetPath"
+             BuildInParallel="false">
+      <Output TaskParameter="TargetOutputs" ItemName="_DatabaseProjectDacpac" />
+    </MSBuild>
+    <ItemGroup>
+      <_DacpacToCopy Include="%(_DatabaseProjectDacpac.RootDir)%(_DatabaseProjectDacpac.Directory)*.dacpac" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_DacpacToCopy)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- The project's own post-deployment script, re-run by the tests after each clean. -->
+  <ItemGroup>
+    <None Include="..\Sample.Database\Script.PostDeployment.sql"
+          Link="Script.PostDeployment.sql"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

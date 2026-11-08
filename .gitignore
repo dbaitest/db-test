@@ -19,6 +19,9 @@ coverage*.md
 coverage*.info
 StrykerOutput/
 
+# Local agent plans and reports: working notes, never published
+plans/
+
 # Local environment
 .env
 .env.local

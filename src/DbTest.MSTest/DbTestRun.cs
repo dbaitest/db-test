@@ -57,7 +57,7 @@ public static class DbTestRun
     /// <param name="containerOptions">Container options, or null for the engine defaults.</param>
     /// <param name="loadOptions">Schema load options, or null for the defaults.</param>
     /// <param name="cancellationToken">Cancels the wait; a start already under way keeps going for the next caller.</param>
-    public static async Task<DbTestHarness> GetHarnessAsync(
+    public static Task<DbTestHarness> GetHarnessAsync(
         DbEngine engine,
         string? schemaRoot = null,
         DbContainerOptions? containerOptions = null,
@@ -66,9 +66,47 @@ public static class DbTestRun
     {
         ArgumentNullException.ThrowIfNull(engine);
 
-        var resolvedRoot = schemaRoot is null ? null : Path.GetFullPath(schemaRoot, AppContext.BaseDirectory);
+        var source = schemaRoot is null
+            ? null
+            : new DirectorySchemaSource(Path.GetFullPath(schemaRoot, AppContext.BaseDirectory), loadOptions);
+
+        return GetCoreAsync(engine, source, containerOptions, cancellationToken);
+    }
+
+    /// <summary>
+    /// Returns the shared harness for an engine and schema source, starting it on first use.
+    /// Harnesses are shared by <see cref="SchemaSource.Key"/>.
+    /// </summary>
+    /// <param name="engine">The engine. Only its type, name and the options identify the harness.</param>
+    /// <param name="schemaSource">
+    /// The schema to apply. Relative paths inside a source resolve against the current
+    /// directory; pass <c>Path.Join(AppContext.BaseDirectory, …)</c> for files copied to output.
+    /// </param>
+    /// <param name="containerOptions">Container options, or null for the engine defaults.</param>
+    /// <param name="cancellationToken">Cancels the wait; a start already under way keeps going for the next caller.</param>
+    public static Task<DbTestHarness> GetHarnessAsync(
+        DbEngine engine,
+        SchemaSource schemaSource,
+        DbContainerOptions? containerOptions = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(engine);
+        ArgumentNullException.ThrowIfNull(schemaSource);
+
+        return GetCoreAsync(engine, schemaSource, containerOptions, cancellationToken);
+    }
+
+    private static async Task<DbTestHarness> GetCoreAsync(
+        DbEngine engine,
+        SchemaSource? source,
+        DbContainerOptions? containerOptions,
+        CancellationToken cancellationToken)
+    {
         var options = containerOptions ?? new DbContainerOptions();
-        var key = BuildKey(engine, resolvedRoot, options, loadOptions);
+        // The source type is part of the key: two kinds of source that happen to produce the same
+        // Key string still deploy different things. "none" marks a harness with no schema.
+        var schemaKey = source is null ? "none" : source.GetType().FullName + ":" + source.Key;
+        var key = BuildKey(engine, schemaKey, options);
 
         Task<DbTestHarness>? harness;
         await Gate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -76,7 +114,9 @@ public static class DbTestRun
         {
             if (!Harnesses.TryGetValue(key, out harness))
             {
-                harness = DbTestHarness.StartAsync(engine, resolvedRoot, options, loadOptions, CancellationToken.None);
+                harness = source is null
+                    ? DbTestHarness.StartAsync(engine, schemaRoot: null, options, cancellationToken: CancellationToken.None)
+                    : DbTestHarness.StartAsync(engine, source, options, CancellationToken.None);
                 Harnesses[key] = harness;
             }
         }
@@ -138,14 +178,15 @@ public static class DbTestRun
     /// Identifies a harness by everything that changes the container or the schema baseline:
     /// two test classes share a container only when every one of these is equal.
     /// </summary>
+    /// <remarks>
+    /// The schema part is <see cref="SchemaSource.Key"/>, which covers the directory and its
+    /// load options, or a dacpac and its deploy options.
+    /// </remarks>
     internal static string BuildKey(
         DbEngine engine,
-        string? schemaRoot,
-        DbContainerOptions options,
-        SchemaLoadOptions? loadOptions)
+        string? schemaKey,
+        DbContainerOptions options)
     {
-        static string List(IEnumerable<string>? values) => values is null ? string.Empty : string.Join(',', values);
-
         var environment = options.Environment
             .OrderBy(pair => pair.Key, StringComparer.Ordinal)
             .Select(pair => $"{pair.Key}={pair.Value}");
@@ -154,14 +195,11 @@ public static class DbTestRun
             '\u001f',
             engine.GetType().FullName,
             engine.Name,
-            schemaRoot,
             options.Image,
             options.Database,
             options.Username,
             options.Password,
-            List(environment),
-            List(loadOptions?.ExcludedDirectories),
-            List(loadOptions?.ExcludedFileNamePatterns),
-            List(loadOptions?.OrderedDirectories));
+            string.Join(',', environment),
+            schemaKey);
     }
 }

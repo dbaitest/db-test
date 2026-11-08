@@ -1,0 +1,5 @@
+CREATE TABLE dbo.Customers
+(
+    Id    INT IDENTITY(1, 1) NOT NULL CONSTRAINT PK_Customers PRIMARY KEY,
+    Email NVARCHAR(200)      NOT NULL CONSTRAINT UQ_Customers_Email UNIQUE
+);

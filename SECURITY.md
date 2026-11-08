@@ -25,3 +25,10 @@ Weak default container passwords are by design and out of scope.
 
 Dependencies are checked on every build: a dependency with a moderate or worse advisory
 fails CI, and Dependabot proposes the update.
+
+One gap: the `Microsoft.Build.Sql` MSBuild SDK, which builds the database project in
+`samples/MsSqlDacpac`, ships its own copies of DacFx and SqlClient inside the SDK package.
+NuGet's audit does not see an SDK's contents, so an advisory against those copies does not
+fail CI. The SDK only runs at build time, only for the sample (the release workflow never
+builds it), and its version is pinned in `global.json` under `msbuild-sdks`. The DacFx that
+`DbTest.MsSql.Dacpac` ships with is an ordinary package reference and is audited.
