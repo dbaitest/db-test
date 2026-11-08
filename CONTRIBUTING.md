@@ -144,9 +144,11 @@ offers an *Activate for 7 days* button on the policy.
 If a publish fails half way, run the `Publish` workflow by hand and give it the release tag.
 The push uses `--skip-duplicate`, so the packages that already landed do not fail the run.
 
-After the first release of a version line, set `PackageValidationBaselineVersion` in
-`src/Directory.Build.props` to it: from then on `dotnet pack` fails when the public API
-breaks compatibility with that release.
+`PackageValidationBaselineVersion` in `src/Directory.Build.props` names the last release:
+`dotnet pack` (and so the `build` check) fails when the public API breaks compatibility with
+it. After each release, raise it to the new version; a deliberate breaking change raises it
+in the same pull request. A package published for the first time has no baseline yet, so
+release it once before its ID is validated.
 
 ## Ground rules
 

@@ -46,12 +46,13 @@
   </PropertyGroup>
 
   <!--
-    Package validation checks that every target framework exposes a compatible API surface.
-    Once 0.2.0 is on nuget.org, set PackageValidationBaselineVersion to it so a later release
-    cannot break the public API by accident.
+    Package validation checks that every target framework exposes a compatible API surface,
+    and that the public API stays compatible with the baseline release on nuget.org. A
+    deliberate breaking change raises the baseline in the same pull request.
   -->
   <PropertyGroup>
     <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageValidationBaselineVersion>0.2.0</PackageValidationBaselineVersion>
   </PropertyGroup>
 
   <ItemGroup>
