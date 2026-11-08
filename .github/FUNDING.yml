@@ -1,4 +1,5 @@
-# The Sponsor button on the repository, and the Sponsors section in the README, both read
-# this file. The money goes to a GitHub Sponsors account; nothing is wired up to a payment
-# provider directly.
+# The Sponsor button on the repository reads this file. The account below has applied for a
+# GitHub Sponsors listing that is not approved yet; the README shows no Sponsors badge until
+# it is. When it is approved, add the badge back (the shields.io route takes the user only):
+#   [![Sponsors](https://img.shields.io/github/sponsors/dbaitest?style=for-the-badge&logo=github)](https://github.com/sponsors/dbaitest)
 github: [dbaitest]

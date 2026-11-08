@@ -7,6 +7,11 @@ may break the API, and the breaking changes are listed first.
 
 ## [Unreleased]
 
+### Changed
+
+- The README no longer shows a Sponsors badge or section: the GitHub Sponsors listing is
+  not approved yet, and the badge rendered as "404: badge not found" on GitHub and nuget.org.
+
 ## [0.2.0] - 2026-11-08
 
 ### Breaking

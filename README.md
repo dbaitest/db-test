@@ -3,7 +3,6 @@
 [![Build](https://github.com/dbaitest/db-test/actions/workflows/ci.yml/badge.svg)](https://github.com/dbaitest/db-test/actions/workflows/ci.yml)
 [![NuGet](https://img.shields.io/nuget/v/DbTest.Core.svg)](https://www.nuget.org/packages/DbTest.Core)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Sponsors](https://img.shields.io/github/sponsors/dbaitest/db-test.svg?style=for-the-badge&logo=github)](https://github.com/sponsors/dbaitest)
 
 A .NET library for **database integration testing** that runs the same test body against
 **SQL Server, PostgreSQL and MySQL**.
@@ -258,14 +257,10 @@ are inherited, as are schema discovery, ordering, exclusion and the shape guard.
 `DbEngine` is an abstract class rather than an interface so new capabilities can arrive as
 virtual members with a default, without breaking an engine written outside this repository.
 
-## Sponsors
+## Maintainers
 
-`db-test` is maintained by [dbaitest](https://github.com/dbaitest). Sponsorship pays for
-the Docker minutes the integration suite burns on every pull request, and for the ADO.NET
-edge cases — a `GO` batch inside a stored procedure, a `TRUNCATE` that a foreign key
-refuses — that nobody else wants to own.
-
-[![Sponsor](https://img.shields.io/github/sponsors/dbaitest/db-test.svg?style=for-the-badge&logo=github&color=ea4aaa)](https://github.com/sponsors/dbaitest)
+`db-test` is maintained by [dbaitest](https://github.com/dbaitest) and
+[locd2o](https://github.com/locd2o).
 
 ## Contributing
 
