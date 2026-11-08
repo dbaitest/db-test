@@ -52,6 +52,15 @@ public static partial class SqlStatementSplitter
             }
         }
 
+        /// <summary>Appends <c>script[start..end)</c>, one character at a time.</summary>
+        public void AppendRange(string script, int start, int end, bool isCode)
+        {
+            for (var k = start; k < end; k++)
+            {
+                Append(script[k], isCode);
+            }
+        }
+
         public void MarkLineStart() => AtLineStart = true;
 
         /// <summary>Adds the command to <paramref name="commands"/> when it holds code, then resets.</summary>

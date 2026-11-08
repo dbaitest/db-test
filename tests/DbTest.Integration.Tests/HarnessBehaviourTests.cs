@@ -22,7 +22,7 @@ public abstract class HarnessBehaviourTestsBase : DbTestBase
     protected abstract string SchemaDirectory { get; }
 
     /// <inheritdoc />
-    protected override string SchemaRoot => Path.Combine("Schema", SchemaDirectory);
+    protected override string SchemaRoot => Path.Join("Schema", SchemaDirectory);
 
     /// <summary>
     /// Adds the probe column. The DDL is dialect-specific, the assertion is not: that split

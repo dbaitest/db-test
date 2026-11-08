@@ -114,9 +114,9 @@ public static class SchemaLoader
 
         // Explicit directory order first (each directory with everything below it), then
         // everything else.
-        foreach (var directory in options.OrderedDirectories)
+        var prefixes = options.OrderedDirectories.Select(d => d.Replace('\\', '/').Trim('/') + "/");
+        foreach (var prefix in prefixes)
         {
-            var prefix = directory.Replace('\\', '/').Trim('/') + "/";
             var inDirectory = remaining
                 .Where(s => s.RelativePath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                 .ToList();

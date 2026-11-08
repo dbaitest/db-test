@@ -10,7 +10,7 @@ public sealed class SchemaLoaderTests
     [TestInitialize]
     public void CreateSchemaDirectory()
     {
-        _root = Path.Combine(Path.GetTempPath(), "dbtest-loader-" + Guid.NewGuid().ToString("N"));
+        _root = Path.Join(Path.GetTempPath(), "dbtest-loader-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_root);
     }
 
@@ -70,12 +70,12 @@ public sealed class SchemaLoaderTests
     [TestMethod]
     public void Throws_When_The_Root_Does_Not_Exist()
     {
-        Assert.ThrowsExactly<DirectoryNotFoundException>(() => SchemaLoader.Load(Path.Combine(_root, "missing")));
+        Assert.ThrowsExactly<DirectoryNotFoundException>(() => SchemaLoader.Load(Path.Join(_root, "missing")));
     }
 
     private void Write(string relativePath)
     {
-        var path = Path.Combine(_root, relativePath);
+        var path = Path.Join(_root, relativePath);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, "SELECT 1;");
     }

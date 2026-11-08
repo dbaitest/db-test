@@ -83,13 +83,11 @@ public static partial class SqlStatementSplitter
 
             if (c == '-' && next == '-')
             {
+                // A line comment runs to the end of the line; the line break itself is
+                // processed by the next iteration.
                 var end = EndOfLine(script, i);
-                for (; i < end; i++)
-                {
-                    buffer.Append(script[i], isCode: false);
-                }
-
-                i--;
+                buffer.AppendRange(script, i, end, isCode: false);
+                i = end - 1;
                 continue;
             }
 
@@ -145,15 +143,14 @@ public static partial class SqlStatementSplitter
             j++;
         }
 
-        if (j > digitsStart)
-        {
-            // "GO3" is not sqlcmd syntax; the count must be separated from GO.
-            if (digitsStart == index + 2
+        // "GO3" is not sqlcmd syntax (the count must be separated from GO), and the count must
+        // be a positive number.
+        if (j > digitsStart
+            && (digitsStart == index + 2
                 || !int.TryParse(script.AsSpan(digitsStart, j - digitsStart), out repeat)
-                || repeat < 1)
-            {
-                return false;
-            }
+                || repeat < 1))
+        {
+            return false;
         }
 
         SkipBlanks(script, ref j, lineEnd);

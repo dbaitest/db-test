@@ -98,13 +98,11 @@ public static partial class SqlStatementSplitter
 
             if (c == '#' || (c == '-' && next == '-' && (i + 2 >= script.Length || char.IsWhiteSpace(script[i + 2]))))
             {
+                // A line comment runs to the end of the line; the line break itself is
+                // processed by the next iteration.
                 var end = EndOfLine(script, i);
-                for (; i < end; i++)
-                {
-                    buffer.Append(script[i], isCode: false);
-                }
-
-                i--;
+                buffer.AppendRange(script, i, end, isCode: false);
+                i = end - 1;
                 continue;
             }
 

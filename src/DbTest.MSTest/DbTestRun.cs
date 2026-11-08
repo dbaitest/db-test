@@ -103,24 +103,19 @@ public static class DbTestRun
         {
             foreach (var pending in Harnesses.Values)
             {
-                DbTestHarness harness;
-                try
+                // Wait for a start still in progress, whatever its outcome. One that failed
+                // never produced a container; the tests that needed it already reported why.
+                await ((Task)pending).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                if (!pending.IsCompletedSuccessfully)
                 {
-                    harness = await pending.ConfigureAwait(false);
-                }
-                catch (Exception)
-                {
-                    // It never started; the tests that needed it already reported why.
                     continue;
                 }
 
-                try
+                var disposal = pending.Result.DisposeAsync().AsTask();
+                await disposal.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                if (disposal.Exception is { } failure)
                 {
-                    await harness.DisposeAsync().ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    failures.Add(ex);
+                    failures.AddRange(failure.InnerExceptions);
                 }
             }
 
