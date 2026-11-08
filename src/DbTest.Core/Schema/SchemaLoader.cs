@@ -109,24 +109,23 @@ public static class SchemaLoader
 
     private static List<SchemaScript> Order(List<SchemaScript> scripts, SchemaLoadOptions options)
     {
-        var ordered = new List<SchemaScript>(scripts.Count);
-        var remaining = scripts.OrderBy(s => s.RelativePath, StringComparer.OrdinalIgnoreCase).ToList();
+        // A file's rank is the position of the first ordered directory it lives in (that
+        // directory or below it); files outside every ordered directory come last. Within a
+        // rank, files keep their path order.
+        var prefixes = options.OrderedDirectories
+            .Select(d => d.Replace('\\', '/').Trim('/') + "/")
+            .ToList();
 
-        // Explicit directory order first (each directory with everything below it), then
-        // everything else.
-        var prefixes = options.OrderedDirectories.Select(d => d.Replace('\\', '/').Trim('/') + "/");
-        foreach (var prefix in prefixes)
+        int Rank(SchemaScript script)
         {
-            var inDirectory = remaining
-                .Where(s => s.RelativePath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            ordered.AddRange(inDirectory);
-            remaining.RemoveAll(inDirectory.Contains);
+            var index = prefixes.FindIndex(p => script.RelativePath.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+            return index < 0 ? prefixes.Count : index;
         }
 
-        ordered.AddRange(remaining);
-        return ordered;
+        return scripts
+            .OrderBy(Rank)
+            .ThenBy(s => s.RelativePath, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 }
 

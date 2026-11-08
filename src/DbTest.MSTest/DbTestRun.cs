@@ -105,7 +105,8 @@ public static class DbTestRun
             {
                 // Wait for a start still in progress, whatever its outcome. One that failed
                 // never produced a container; the tests that needed it already reported why.
-                await ((Task)pending).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                // Task.WhenAny completes with the task and never throws its exception.
+                await Task.WhenAny(pending).ConfigureAwait(false);
                 if (!pending.IsCompletedSuccessfully)
                 {
                     continue;
