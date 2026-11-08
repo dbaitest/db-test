@@ -14,7 +14,7 @@ namespace DbTest.Core.Schema;
 /// </para>
 /// <para>
 /// A source resolves a relative path against the current directory. To resolve one against
-/// the test binaries' directory, pass <c>Path.Combine(AppContext.BaseDirectory, …)</c>.
+/// the test binaries' directory, pass <c>Path.Join(AppContext.BaseDirectory, …)</c>.
 /// </para>
 /// <para>
 /// This is an abstract class rather than an interface for the same reason as

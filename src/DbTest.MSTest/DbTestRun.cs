@@ -80,7 +80,7 @@ public static class DbTestRun
     /// <param name="engine">The engine. Only its type, name and the options identify the harness.</param>
     /// <param name="schemaSource">
     /// The schema to apply. Relative paths inside a source resolve against the current
-    /// directory; pass <c>Path.Combine(AppContext.BaseDirectory, …)</c> for files copied to output.
+    /// directory; pass <c>Path.Join(AppContext.BaseDirectory, …)</c> for files copied to output.
     /// </param>
     /// <param name="containerOptions">Container options, or null for the engine defaults.</param>
     /// <param name="cancellationToken">Cancels the wait; a start already under way keeps going for the next caller.</param>

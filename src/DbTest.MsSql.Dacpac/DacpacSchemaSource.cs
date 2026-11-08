@@ -5,7 +5,6 @@ using System.Diagnostics;
 using DbTest.Core.Engine;
 using DbTest.Core.Schema;
 
-using Microsoft.Data.SqlClient;
 using Microsoft.SqlServer.Dac;
 
 namespace DbTest.MsSql.Dacpac;
@@ -34,7 +33,7 @@ public sealed class DacpacSchemaSource : SchemaSource
     /// <param name="dacpacPath">
     /// Path of the <c>.dacpac</c>. A relative path is resolved against the current directory
     /// now; for a dacpac copied next to the tests pass
-    /// <c>Path.Combine(AppContext.BaseDirectory, "MyDatabase.dacpac")</c>.
+    /// <c>Path.Join(AppContext.BaseDirectory, "MyDatabase.dacpac")</c>.
     /// </param>
     /// <param name="deployOptions">
     /// DacFx deploy options, or null for the defaults described on <see cref="CreateDefaultOptions"/>.
@@ -186,18 +185,32 @@ public sealed class DacpacSchemaSource : SchemaSource
             or UnauthorizedAccessException;
 
     /// <summary>Removes the password from text that may end up in a test log.</summary>
+    /// <remarks>
+    /// The connection string is only parsed, never connected with, so the generic builder is
+    /// enough; it also covers the <c>PWD</c> alias.
+    /// </remarks>
     internal static string Redact(string text, string connectionString)
     {
-        string password;
+        var builder = new DbConnectionStringBuilder();
         try
         {
-            password = new SqlConnectionStringBuilder(connectionString).Password;
+            builder.ConnectionString = connectionString;
         }
         catch (ArgumentException)
         {
             return text;
         }
 
-        return string.IsNullOrEmpty(password) ? text : text.Replace(password, "[redacted]", StringComparison.Ordinal);
+        foreach (var key in new[] { "Password", "PWD" })
+        {
+            if (builder.TryGetValue(key, out var value)
+                && value is string password
+                && password.Length > 0)
+            {
+                text = text.Replace(password, "[redacted]", StringComparison.Ordinal);
+            }
+        }
+
+        return text;
     }
 }

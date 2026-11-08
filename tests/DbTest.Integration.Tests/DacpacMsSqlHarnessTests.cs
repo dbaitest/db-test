@@ -177,7 +177,7 @@ public sealed class DacpacMsSqlHarnessTests : DbTestBase
 
     private static string BuildPackage(string name, IEnumerable<string> objects)
     {
-        var path = Path.Combine(Path.GetTempPath(), $"{name}-{Guid.NewGuid():N}.dacpac");
+        var path = Path.Join(Path.GetTempPath(), $"{name}-{Guid.NewGuid():N}.dacpac");
 
         using var model = new TSqlModel(SqlServerVersion.Sql160, new TSqlModelOptions());
         foreach (var definition in objects)

@@ -53,7 +53,7 @@ public sealed class DbTestRunKeyTests
         var fromRoot = new DirectorySchemaSource(Path.GetFullPath("Schema/mssql", AppContext.BaseDirectory));
 
         // ... and what a test writes when it overrides Schema instead.
-        var explicitSource = new DirectorySchemaSource(Path.Combine(AppContext.BaseDirectory, "Schema/mssql"));
+        var explicitSource = new DirectorySchemaSource(Path.Join(AppContext.BaseDirectory, "Schema/mssql"));
 
         Assert.AreEqual(fromRoot.Key, explicitSource.Key);
     }

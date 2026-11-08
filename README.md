@@ -184,7 +184,7 @@ public sealed class ShopTests : DbTestBase
     protected override DbEngine CreateEngine() => new MsSqlEngine();
 
     protected override SchemaSource? SchemaSource =>
-        new DacpacSchemaSource(Path.Combine(AppContext.BaseDirectory, "Shop.Database.dacpac"));
+        new DacpacSchemaSource(Path.Join(AppContext.BaseDirectory, "Shop.Database.dacpac"));
 }
 ```
 

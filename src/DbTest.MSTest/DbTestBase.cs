@@ -51,7 +51,7 @@ public abstract class DbTestBase
     /// The schema source for the engine, or null to use <see cref="SchemaRoot"/>. Use it for a
     /// schema that is not a directory of SQL files, such as a SQL Server <c>.dacpac</c>. A
     /// relative path inside a source resolves against the current directory: pass
-    /// <c>Path.Combine(AppContext.BaseDirectory, …)</c> for files copied next to the tests.
+    /// <c>Path.Join(AppContext.BaseDirectory, …)</c> for files copied next to the tests.
     /// Setting it together with <see cref="SchemaRoot"/> or <see cref="SchemaLoadOptions"/>
     /// is an error.
     /// </summary>

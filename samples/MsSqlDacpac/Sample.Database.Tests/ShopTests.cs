@@ -19,7 +19,7 @@ public sealed class ShopTests : DbTestBase
 
     // The .dacpac is copied next to the test binaries by the CopyDacpacs target in the .csproj.
     protected override SchemaSource? SchemaSource =>
-        new DacpacSchemaSource(Path.Combine(AppContext.BaseDirectory, "Sample.Database.dacpac"));
+        new DacpacSchemaSource(Path.Join(AppContext.BaseDirectory, "Sample.Database.dacpac"));
 
     /// <summary>
     /// Starts every test from the deployed state: CleanAsync empties every table — including the
@@ -31,7 +31,7 @@ public sealed class ShopTests : DbTestBase
         await Harness.CleanAsync(TestContext.CancellationToken);
 
         var postDeployment = await File.ReadAllTextAsync(
-            Path.Combine(AppContext.BaseDirectory, "Script.PostDeployment.sql"),
+            Path.Join(AppContext.BaseDirectory, "Script.PostDeployment.sql"),
             TestContext.CancellationToken);
         await Harness.ExecuteAsync(postDeployment, TestContext.CancellationToken);
     }

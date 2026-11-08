@@ -11,7 +11,7 @@ namespace DbTest.Core.Tests;
 [TestClass]
 public sealed class DacpacSchemaSourceTests
 {
-    private static string MissingPath => Path.Combine(Path.GetTempPath(), $"dbtest-missing-{Guid.NewGuid():N}.dacpac");
+    private static string MissingPath => Path.Join(Path.GetTempPath(), $"dbtest-missing-{Guid.NewGuid():N}.dacpac");
 
     [TestMethod]
     public void Key_Of_A_Missing_Dacpac_Does_Not_Throw()
@@ -113,7 +113,7 @@ public sealed class DacpacSchemaSourceTests
     [TestMethod]
     public async Task A_File_That_Is_Not_A_Dacpac_Is_A_Failure_Not_An_Exception()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"dbtest-corrupt-{Guid.NewGuid():N}.dacpac");
+        var path = Path.Join(Path.GetTempPath(), $"dbtest-corrupt-{Guid.NewGuid():N}.dacpac");
         await File.WriteAllBytesAsync(path, [0x00, 0x01, 0x02, 0x03, 0x04]);
 
         try
@@ -150,6 +150,16 @@ public sealed class DacpacSchemaSourceTests
 
         Assert.DoesNotContain("Sup3r-Secret!", text);
         Assert.Contains("[redacted]", text);
+    }
+
+    [TestMethod]
+    public void Redact_Covers_The_Pwd_Alias()
+    {
+        const string connectionString = "Server=localhost;Database=db;UID=sa;PWD=Sup3r-Secret!";
+
+        var text = DacpacSchemaSource.Redact("Login failed with Sup3r-Secret! for sa", connectionString);
+
+        Assert.DoesNotContain("Sup3r-Secret!", text);
     }
 
     [TestMethod]
