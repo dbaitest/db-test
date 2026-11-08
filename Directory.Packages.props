@@ -3,9 +3,9 @@
   <ItemGroup>
     <!-- Test framework. DbTest.MSTest ships against MSTest.TestFramework only. -->
     <PackageVersion Include="MSTest" Version="4.0.2" />
-    <PackageVersion Include="MSTest.TestFramework" Version="4.0.2" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
-    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+    <PackageVersion Include="MSTest.TestFramework" Version="4.5.2" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+    <PackageVersion Include="coverlet.collector" Version="10.1.0" />
 
     <!-- Containers. 4.16.0 or later: it brings SSH.NET 2026.0.0 (GHSA-mggc-4xg6-vcxf, GHSA-q939-rpr3-3284). -->
     <PackageVersion Include="Testcontainers.MsSql" Version="4.16.0" />
