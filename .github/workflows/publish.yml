@@ -5,6 +5,13 @@ on:
     types: [published]
   # A release can be re-published by hand when nuget.org rejected a package.
   workflow_dispatch:
+    inputs:
+      tag:
+        description: The release tag to publish, for example v0.2.0
+        required: true
+
+permissions:
+  contents: read
 
 jobs:
   publish:
@@ -17,21 +24,45 @@ jobs:
     # environment claim when the job names it.
     environment: production
 
-    steps:
-      - uses: actions/checkout@v4
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
 
-      - uses: actions/setup-dotnet@v4
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ env.TAG }}
+
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: |
             8.0.x
-            9.0.x
             10.0.x
+
+      # The tag is the version: v0.2.0 publishes 0.2.0, v0.3.0-beta.1 publishes 0.3.0-beta.1.
+      # Nothing in the repository holds a version, so a release can never publish a stale one.
+      - name: Read the version from the tag
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::The tag '$TAG' is not v<semver>."
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
 
       - name: Restore
         run: dotnet restore
 
+      - name: Build
+        run: dotnet build --configuration Release --no-restore -p:Version="$VERSION"
+
+      # The tag was cut from a main that passed CI; the unit tests are the last cheap check
+      # that what is about to be packed is what was tested.
+      - name: Unit tests
+        run: dotnet test tests/DbTest.Core.Tests --configuration Release --no-build
+
       - name: Pack
-        run: dotnet pack --configuration Release --no-restore --output artifacts
+        run: dotnet pack --configuration Release --no-build --output artifacts -p:Version="$VERSION"
 
       # Trusted publishing: GitHub mints the OIDC token, nuget.org checks it against the
       # policy registered for this repository and hands back a key that lives for one
@@ -66,6 +97,8 @@ jobs:
           echo "::add-mask::$api_key"
           echo "NUGET_API_KEY=$api_key" >> "$GITHUB_ENV"
 
+      # dotnet nuget push also pushes the .snupkg next to each .nupkg to the symbol server.
+      # --skip-duplicate lets a re-run finish a publish that failed half way.
       - name: Push to nuget.org
         run: >-
           dotnet nuget push "artifacts/*.nupkg"
