@@ -1,8 +1,13 @@
 <Project>
 
   <ItemGroup>
-    <!-- Test framework. DbTest.MSTest ships against MSTest.TestFramework only. -->
-    <PackageVersion Include="MSTest" Version="4.0.2" />
+    <!--
+      Test framework. DbTest.MSTest ships against MSTest.TestFramework only. MSTest (which
+      brings MSTest.TestAdapter) and MSTest.TestFramework must carry the SAME version: the
+      adapter refuses to load next to a different framework version, and `dotnet test` then
+      reports "No test is available" and still exits 0, so a mismatch silently runs no tests.
+    -->
+    <PackageVersion Include="MSTest" Version="4.5.2" />
     <PackageVersion Include="MSTest.TestFramework" Version="4.5.2" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     <PackageVersion Include="coverlet.collector" Version="10.1.0" />
