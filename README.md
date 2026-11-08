@@ -221,6 +221,12 @@ project's) are resolved from the folder it is deployed from:
 [`samples/MsSqlDacpac`](samples/MsSqlDacpac) is a complete, runnable example: a database
 project, its tests, and the build wiring. CI runs it on every change.
 
+It also tests application code the way most suites need to: `Sample.Shop` holds an ADO.NET
+and a Dapper repository, and the tests build them unchanged on a connection factory made from
+`Harness.ConnectionString`. Test data comes from SQL scripts and JSON data files
+(`Fixtures/`); every test seeds or checks through something other than the repository under
+test, and one shows rollback isolation with a `TransactionScope` that is never completed.
+
 What to know:
 
 - **A missing dacpac fails before any container starts**, with the full path it looked for.
@@ -338,7 +344,8 @@ tests/DbTest.Core.Tests  unit tests, no Docker
 tests/DbTest.Integration.Tests
                          one shared test body, run against all three engines, plus a
                          dacpac deploy on SQL Server
-samples/MsSqlDacpac      a SQL Server database project and its tests (own solution)
+samples/MsSqlDacpac      a SQL Server database project, a data-access library (ADO.NET and
+                         Dapper repositories) and their tests (own solution)
 ```
 
 ## Writing an engine

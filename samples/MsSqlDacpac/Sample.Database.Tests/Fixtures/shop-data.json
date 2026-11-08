@@ -1,0 +1,18 @@
+{
+  "_provenance": {
+    "kind": "invented",
+    "purpose": "Three customers with distinct order totals (99.00, 50.00, 5.00), so a ranking test cannot pass with the wrong order.",
+    "personalData": "none: example.test addresses only"
+  },
+  "dbo.Customers": [
+    { "Id": 10, "Email": "ada@example.test" },
+    { "Id": 11, "Email": "grace@example.test" },
+    { "Id": 12, "Email": "linus@example.test" }
+  ],
+  "dbo.Orders": [
+    { "Id": 100, "CustomerId": 10, "RegionCode": "NL", "Amount": 40.00 },
+    { "Id": 101, "CustomerId": 11, "RegionCode": "GB", "Amount": 99.00 },
+    { "Id": 102, "CustomerId": 10, "RegionCode": "DE", "Amount": 10.00 },
+    { "Id": 103, "CustomerId": 12, "RegionCode": "NL", "Amount": 5.00 }
+  ]
+}
