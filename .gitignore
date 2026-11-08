@@ -22,6 +22,9 @@ StrykerOutput/
 # Local agent plans and reports: working notes, never published
 plans/
 
+# Local agent state (Claude Code settings, agent memory): per machine, never published
+.claude/
+
 # Local environment
 .env
 .env.local
