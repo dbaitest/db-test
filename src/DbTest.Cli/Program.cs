@@ -1,6 +1,6 @@
 using DbTest.Core;
 using DbTest.Core.Engine;
-
+using DbTest.Core.Schema;
 using DbTest.MsSql;
 using DbTest.MySql;
 using DbTest.PostgreSql;
@@ -18,28 +18,44 @@ public static class Program
     {
         EngineRegistration.RegisterBuiltins();
 
-        if (args.Length == 0 || args[0] is "-h" or "--help" or "help")
+        // Ctrl+C cancels the running command instead of killing the process, so the container
+        // is disposed on the way out.
+        using var cancellation = new CancellationTokenSource();
+        Console.CancelKeyPress += (_, e) =>
         {
-            PrintUsage();
-            return args.Length == 0 ? 1 : 0;
-        }
-
-        var command = args[0];
-        var options = ParseOptions(args.Skip(1));
+            e.Cancel = true;
+            cancellation.Cancel();
+        };
 
         try
         {
-            return command switch
+            var arguments = CliArguments.Parse(args);
+            return arguments.Command switch
             {
+                "help" => PrintUsage(exitCode: args.Length == 0 ? 1 : 0),
                 "engines" => ListEngines(),
-                "up" => await UpAsync(options).ConfigureAwait(false),
-                "schema" => await ShowSchemaAsync(options).ConfigureAwait(false),
-                _ => UnknownCommand(command),
+                "up" => await UpAsync(arguments, cancellation.Token).ConfigureAwait(false),
+                "schema" => await ShowSchemaAsync(arguments, cancellation.Token).ConfigureAwait(false),
+                _ => throw new CliUsageException($"unknown command '{arguments.Command}'."),
             };
+        }
+        catch (CliUsageException ex)
+        {
+            await Console.Error.WriteLineAsync($"error: {ex.Message}").ConfigureAwait(false);
+            await Console.Error.WriteLineAsync().ConfigureAwait(false);
+            PrintUsage(exitCode: 2);
+            return 2;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            await Console.Error.WriteLineAsync("Cancelled.").ConfigureAwait(false);
+            return 130;
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"error: {ex.Message}");
+            // A CLI reports a failure — Docker not running, a broken schema, a bad image — as
+            // one line, not as a stack trace.
+            await Console.Error.WriteLineAsync($"error: {ex.Message}").ConfigureAwait(false);
             return 1;
         }
     }
@@ -55,48 +71,57 @@ public static class Program
         return 0;
     }
 
-    private static async Task<int> UpAsync(CommandOptions options)
+    /// <summary>
+    /// Starts a container, applies the schema, prints the connection string and keeps the
+    /// container running until Ctrl+C — a container that disappears as soon as its connection
+    /// string is printed is of no use to anyone.
+    /// </summary>
+    private static async Task<int> UpAsync(CliArguments arguments, CancellationToken cancellationToken)
     {
-        var engine = EngineRegistry.Create(options.Engine);
-        var schemaRoot = options.Schema;
+        var engine = EngineRegistry.Create(arguments.RequireEngine());
 
-        Console.WriteLine($"Starting {engine.Name} ({options.Image ?? engine.DefaultImage})...");
+        Console.WriteLine($"Starting {engine.Name} ({arguments.Image ?? engine.DefaultImage})...");
 
         await using var harness = await DbTestHarness.StartAsync(
             engine,
-            schemaRoot,
+            arguments.Schema,
             new DbContainerOptions
             {
-                Image = options.Image,
-                Database = options.Database,
-                Username = options.Username,
-                Password = options.Password,
-            });
+                Image = arguments.Image,
+                Database = arguments.Database,
+                Username = arguments.Username,
+                Password = arguments.Password,
+            },
+            cancellationToken: cancellationToken).ConfigureAwait(false);
 
         Console.WriteLine($"Container is up: {harness.Image}");
         Console.WriteLine($"Connection string: {harness.ConnectionString}");
 
-        if (schemaRoot is not null)
+        if (arguments.Schema is not null)
         {
-            Console.WriteLine($"Schema applied from {schemaRoot}.");
+            Console.WriteLine($"Schema applied from {arguments.Schema}.");
         }
 
-        Console.WriteLine("The container is removed when this command exits.");
+        Console.WriteLine("Press Ctrl+C to stop and remove the container.");
+
+        try
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            Console.WriteLine("Stopping the container...");
+        }
+
         return 0;
     }
 
-    private static async Task<int> ShowSchemaAsync(CommandOptions options)
+    private static async Task<int> ShowSchemaAsync(CliArguments arguments, CancellationToken cancellationToken)
     {
-        var engine = EngineRegistry.Create(options.Engine);
-        var schemaRoot = options.Schema;
+        var engine = EngineRegistry.Create(arguments.RequireEngine());
+        var schemaRoot = arguments.Schema ?? throw new CliUsageException("'schema' needs --schema <dir>.");
 
-        if (schemaRoot is null)
-        {
-            Console.Error.WriteLine("error: --schema <dir> is required.");
-            return 1;
-        }
-
-        var load = Core.Schema.SchemaLoader.Load(schemaRoot);
+        var load = SchemaLoader.Load(schemaRoot);
 
         Console.WriteLine($"{load.Scripts.Count} script(s) will be applied:");
         foreach (var script in load.Scripts)
@@ -113,8 +138,19 @@ public static class Program
             }
         }
 
-        await using var harness = await DbTestHarness.StartAsync(engine, schemaRoot);
-        var objects = await harness.ExecuteOnConnectionAsync(connection => engine.ListObjectsAsync(connection));
+        await using var harness = await DbTestHarness.StartAsync(
+            engine,
+            schemaRoot,
+            new DbContainerOptions
+            {
+                Image = arguments.Image,
+                Database = arguments.Database,
+                Username = arguments.Username,
+                Password = arguments.Password,
+            },
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        var objects = await harness.ListObjectsAsync(cancellationToken).ConfigureAwait(false);
 
         Console.WriteLine($"{objects.Count} object(s) created:");
         foreach (var obj in objects)
@@ -125,56 +161,19 @@ public static class Program
         return 0;
     }
 
-    private static int UnknownCommand(string command)
+    private static int PrintUsage(int exitCode)
     {
-        Console.Error.WriteLine($"error: unknown command '{command}'.");
-        PrintUsage();
-        return 1;
-    }
-
-    private static CommandOptions ParseOptions(IEnumerable<string> args)
-    {
-        var options = new CommandOptions();
-        var list = args.ToList();
-
-        for (var i = 0; i < list.Count; i++)
-        {
-            switch (list[i])
-            {
-                case "--engine":
-                    options.Engine = list[++i];
-                    break;
-                case "--schema":
-                    options.Schema = list[++i];
-                    break;
-                case "--image":
-                    options.Image = list[++i];
-                    break;
-                case "--database":
-                    options.Database = list[++i];
-                    break;
-                case "--username":
-                    options.Username = list[++i];
-                    break;
-                case "--password":
-                    options.Password = list[++i];
-                    break;
-            }
-        }
-
-        return options;
-    }
-
-    private static void PrintUsage()
-    {
-        Console.WriteLine("""
+        var writer = exitCode == 0 ? Console.Out : Console.Error;
+        writer.WriteLine("""
             dbtest - database integration test harness
 
             Usage:
-              dbtest engines                          List the registered engines.
-              dbtest up    --engine <name> [options]  Start a container and apply a schema.
-              dbtest schema --engine <name> --schema <dir>
-                                                    Apply a schema and list the objects it created.
+              dbtest engines                           List the registered engines.
+              dbtest up     --engine <name> [options]  Start a container, apply a schema, and keep
+                                                       it running until Ctrl+C.
+              dbtest schema --engine <name> --schema <dir> [options]
+                                                       Apply a schema, list the objects it
+                                                       created, and remove the container.
 
             Options:
               --engine <name>     mssql | postgres | mysql
@@ -184,24 +183,7 @@ public static class Program
               --username <name>   Login inside the container (default: the engine's own).
               --password <pass>   Password inside the container (default: the engine's own).
             """);
-    }
-
-    /// <summary>Parsed command line options.</summary>
-    private sealed class CommandOptions
-    {
-        public string Engine { get; set; } = "postgres";
-
-        public string? Schema { get; set; }
-
-        public string? Image { get; set; }
-
-        public string Database { get; set; } = "dbtest";
-
-        /// <summary>Null means the engine's own default login.</summary>
-        public string? Username { get; set; }
-
-        /// <summary>Null means the engine's own default password.</summary>
-        public string? Password { get; set; }
+        return exitCode;
     }
 }
 

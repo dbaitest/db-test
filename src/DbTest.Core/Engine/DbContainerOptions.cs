@@ -3,7 +3,7 @@ namespace DbTest.Core.Engine;
 /// <summary>Options for starting a throwaway database container.</summary>
 public sealed class DbContainerOptions
 {
-    /// <summary>Container image. Defaults to the engine's <see cref="IDbEngine.DefaultImage"/>.</summary>
+    /// <summary>Container image. Defaults to the engine's <see cref="DbEngine.DefaultImage"/>.</summary>
     public string? Image { get; init; }
 
     /// <summary>Database name created inside the container.</summary>

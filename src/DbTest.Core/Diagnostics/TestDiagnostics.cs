@@ -17,6 +17,11 @@ namespace DbTest.Core.Diagnostics;
 /// <c>DBTEST_TIMING</c> is <c>1</c>. Diagnostics must never fail a run, so every write is
 /// guarded and a failure is reported on the console and otherwise ignored.
 /// </para>
+/// <para>
+/// The file is appended to, so several test assemblies can share one. The header is written
+/// only when the file is new or empty, and each row is written exactly once however many
+/// times <see cref="Flush"/> is called.
+/// </para>
 /// </remarks>
 public sealed class TestDiagnostics : IDisposable
 {
@@ -29,7 +34,6 @@ public sealed class TestDiagnostics : IDisposable
     private readonly object _gate = new();
     private readonly List<string> _rows = [];
     private readonly string? _path;
-    private bool _headerWritten;
 
     private TestDiagnostics(string? path)
     {
@@ -42,6 +46,8 @@ public sealed class TestDiagnostics : IDisposable
     /// <param name="defaultDirectory">Directory the default file is written to.</param>
     public static TestDiagnostics? TryCreate(string defaultDirectory)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(defaultDirectory);
+
         if (!string.Equals(Environment.GetEnvironmentVariable(EnableVariable), "1", StringComparison.Ordinal))
         {
             return null;
@@ -78,7 +84,10 @@ public sealed class TestDiagnostics : IDisposable
         }
     }
 
-    /// <summary>Writes the collected rows to the configured file.</summary>
+    /// <summary>The file the rows are written to.</summary>
+    public string? FilePath => _path;
+
+    /// <summary>Appends the rows collected since the last flush to the configured file.</summary>
     public void Flush()
     {
         if (_path is null)
@@ -88,25 +97,31 @@ public sealed class TestDiagnostics : IDisposable
 
         lock (_gate)
         {
+            if (_rows.Count == 0)
+            {
+                return;
+            }
+
             try
             {
                 var builder = new StringBuilder();
-                if (!_headerWritten)
+                var file = new FileInfo(_path);
+                if (!file.Exists || file.Length == 0)
                 {
-                    builder.AppendLine("kind\tvalue\tdetail");
-                    _headerWritten = true;
+                    builder.Append("kind\tvalue\tdetail\n");
                 }
 
                 foreach (var row in _rows)
                 {
-                    builder.AppendLine(row);
+                    builder.Append(row).Append('\n');
                 }
 
                 File.AppendAllText(_path, builder.ToString());
+                _rows.Clear();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                Console.WriteLine($"Diagnostics row dropped ({_path}): {ex.Message}");
+                Console.WriteLine($"Diagnostics rows dropped ({_path}): {ex.Message}");
             }
         }
     }
