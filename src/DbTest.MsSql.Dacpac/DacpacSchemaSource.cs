@@ -201,14 +201,14 @@ public sealed class DacpacSchemaSource : SchemaSource
             return text;
         }
 
-        foreach (var key in new[] { "Password", "PWD" })
+        var passwords = new[] { "Password", "PWD" }
+            .Select(key => builder.TryGetValue(key, out var value) ? value as string : null)
+            .OfType<string>()
+            .Where(password => password.Length > 0);
+
+        foreach (var password in passwords)
         {
-            if (builder.TryGetValue(key, out var value)
-                && value is string password
-                && password.Length > 0)
-            {
-                text = text.Replace(password, "[redacted]", StringComparison.Ordinal);
-            }
+            text = text.Replace(password, "[redacted]", StringComparison.Ordinal);
         }
 
         return text;
