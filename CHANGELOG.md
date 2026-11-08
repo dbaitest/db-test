@@ -7,8 +7,36 @@ may break the API, and the breaking changes are listed first.
 
 ## [Unreleased]
 
+### Added
+
+- **`DbTest.MsSql.Dacpac`**, a new package: `DacpacSchemaSource` deploys a SQL Server `.dacpac`
+  — the output of an SSDT or `Microsoft.Build.Sql` database project — into the container
+  with DacFx, so a database project can be tested without ordering its files by hand. A
+  missing dacpac fails before any container starts; a deploy SQL Server rejects fails setup
+  with a `SchemaApplyException`, the password removed from the message. It depends on
+  `Microsoft.SqlServer.DacFx` 170.5.96 and, through `DbTest.MsSql`, on the same
+  `Microsoft.Data.SqlClient` 7.1.1, `Testcontainers.MsSql` and `System.Security.Cryptography.Pkcs`
+  pins. DacFx declares SqlClient 6.x; the 7.x pairing is proven by a deploy test on net8.0
+  and net10.0.
+- `SchemaSource`, the extension point for a schema that is not a directory of SQL files:
+  `Key` (shares containers), `Validate` (runs before the container starts) and `ApplyAsync`.
+  `DirectorySchemaSource` is the directory behaviour `schemaRoot` has always had, and
+  `SchemaApplyContext` carries the engine, connection string and database to a source.
+- `DbTestHarness.StartAsync(engine, SchemaSource, …)`, `DbTestRun.GetHarnessAsync(engine,
+  SchemaSource, …)` and `DbTestBase.SchemaSource`. Setting `SchemaSource` together with
+  `SchemaRoot` or `SchemaLoadOptions` throws instead of ignoring one of them. A test class that
+  already declares its own member named `SchemaSource` now hides the base member (CS0108,
+  an error under `TreatWarningsAsErrors`): rename it.
+- `samples/MsSqlDacpac`: a database project and its tests, run by CI.
+
 ### Changed
 
+- Passing a `null` or `default` literal as the second argument of `DbTestHarness.StartAsync`
+  or `DbTestRun.GetHarnessAsync` no longer compiles (CS0121: the call matches both the
+  `string` and the `SchemaSource` overload). Omit the argument, or write `(string?)null`.
+  Compiled code is unaffected.
+- The release workflow pushes only `DbTest.*` packages, and CI and the release both fail
+  when the packed set differs from the projects under `src/`.
 - The README no longer shows a Sponsors badge or section: the GitHub Sponsors listing is
   not approved yet, and the badge rendered as "404: badge not found" on GitHub and nuget.org.
 

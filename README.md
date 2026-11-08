@@ -93,6 +93,7 @@ dotnet add package DbTest.MSTest        # base class for MSTest (brings DbTest.C
 dotnet add package DbTest.MsSql         # SQL Server engine
 dotnet add package DbTest.PostgreSql    # PostgreSQL engine
 dotnet add package DbTest.MySql         # MySQL engine
+dotnet add package DbTest.MsSql.Dacpac  # deploy a .dacpac (SQL Server database projects)
 ```
 
 `DbTest.Core` alone gives the harness without any test framework. The CLI:
@@ -160,6 +161,93 @@ foreach (var exclusion in load.Excluded)
 A schema that only partly applied fails loudly at setup rather than surfacing later as
 unrelated test failures: `StartAsync` throws a `SchemaApplyException` listing every broken
 file.
+
+## SQL Server database projects
+
+A SQL Server database project (SSDT, or the SDK-style `Microsoft.Build.Sql`) keeps one object
+per file, and the objects depend on each other across folders in both directions: a table in
+`dbo/Tables` has a computed column calling a function in `dbo/Functions`, which reads another
+table in `dbo/Tables`. No file order — not even `OrderedDirectories` — applies that. The
+project builds into a `.dacpac`, and `DbTest.MsSql.Dacpac` deploys the dacpac with DacFx, in
+dependency order:
+
+```csharp
+using DbTest.Core.Engine;
+using DbTest.Core.Schema;
+using DbTest.MsSql;
+using DbTest.MsSql.Dacpac;
+using DbTest.MSTest;
+
+[TestClass]
+public sealed class ShopTests : DbTestBase
+{
+    protected override DbEngine CreateEngine() => new MsSqlEngine();
+
+    protected override SchemaSource? SchemaSource =>
+        new DacpacSchemaSource(Path.Combine(AppContext.BaseDirectory, "Shop.Database.dacpac"));
+}
+```
+
+Reference the database project from the test project, so `dotnet test` builds the dacpac,
+and copy the dacpac next to the test binaries — with every dacpac beside it, because the
+dacpacs it references (`master.dacpac` from `Microsoft.SqlServer.Dacpacs.Master`, another
+project's) are resolved from the folder it is deployed from:
+
+```xml
+<ItemGroup>
+  <ProjectReference Include="..\Shop.Database\Shop.Database.sqlproj"
+                    ReferenceOutputAssembly="false"
+                    SkipGetTargetFrameworkProperties="true"
+                    Private="false" />
+</ItemGroup>
+
+<Target Name="CopyDacpacs" AfterTargets="Build">
+  <MSBuild Projects="@(ProjectReference)"
+           Condition="'%(Extension)' == '.sqlproj'"
+           Targets="GetTargetPath"
+           BuildInParallel="false">
+    <Output TaskParameter="TargetOutputs" ItemName="_DatabaseProjectDacpac" />
+  </MSBuild>
+  <ItemGroup>
+    <_DacpacToCopy Include="%(_DatabaseProjectDacpac.RootDir)%(_DatabaseProjectDacpac.Directory)*.dacpac" />
+  </ItemGroup>
+  <Copy SourceFiles="@(_DacpacToCopy)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+</Target>
+```
+
+[`samples/MsSqlDacpac`](samples/MsSqlDacpac) is a complete, runnable example: a database
+project, its tests, and the build wiring. CI runs it on every change.
+
+What to know:
+
+- **A missing dacpac fails before any container starts**, with the full path it looked for.
+  A dacpac SQL Server rejects fails setup with a `SchemaApplyException` naming the dacpac
+  and the server's error.
+- **Deploy options.** Without options, nothing is dropped, possible data loss does not block
+  the deploy, database-level settings (recovery model, filegroups, …) are skipped because a
+  throwaway container has no use for them, and every command is bounded by the engine's
+  command timeout. Options you pass are used exactly as given, and a bare
+  `new DacDeployOptions()` has no timeout at all — so start from the defaults:
+
+  ```csharp
+  var options = DacpacSchemaSource.CreateDefaultOptions(new MsSqlEngine());
+  options.SqlCommandVariableValues["Environment"] = "Test";
+  return new DacpacSchemaSource(path, options);
+  ```
+
+  Classes whose dacpac or options differ get separate containers.
+- **`CleanAsync` also empties reference data** that the project's post-deployment script
+  seeded. Run the script again after cleaning — the sample does it in `[TestInitialize]`,
+  which works as long as the script is idempotent and has no SQLCMD syntax.
+- **Telemetry.** DacFx sends usage telemetry to Microsoft unless the environment variable
+  `DACFX_TELEMETRY_OPTOUT` is `1`; set `<DacFxTelemetryEnabled>false</DacFxTelemetryEnabled>`
+  in the `.sqlproj` to switch it off at build time too. This repository does both.
+- **Pin the SDK.** Put the `Microsoft.Build.Sql` version in `global.json` under
+  `msbuild-sdks` and write `<Project Sdk="Microsoft.Build.Sql">` without a version, so every
+  project builds with the same one.
+- **Relative paths** given to a schema source resolve against the current directory; use
+  `AppContext.BaseDirectory` for files copied next to the tests, as above. (`SchemaRoot`
+  keeps resolving against the test binaries' directory.)
 
 ## The shape guard
 
@@ -239,12 +327,15 @@ src/DbTest.Core          engine-agnostic: the DbEngine base class, schema loadin
                          splitting, the harness, the shape guard, diagnostics
 src/DbTest.MSTest        DbTestBase and DbTestRun for MSTest
 src/DbTest.MsSql         SQL Server engine
+src/DbTest.MsSql.Dacpac  deploys a SQL Server .dacpac through DacFx (the only DacFx dependency)
 src/DbTest.PostgreSql    PostgreSQL engine
 src/DbTest.MySql         MySQL engine
 src/DbTest.Cli           the `dbtest` command
 tests/DbTest.Core.Tests  unit tests, no Docker
 tests/DbTest.Integration.Tests
-                         one shared test body, run against all three engines
+                         one shared test body, run against all three engines, plus a
+                         dacpac deploy on SQL Server
+samples/MsSqlDacpac      a SQL Server database project and its tests (own solution)
 ```
 
 ## Writing an engine
@@ -256,6 +347,24 @@ are inherited, as are schema discovery, ordering, exclusion and the shape guard.
 
 `DbEngine` is an abstract class rather than an interface so new capabilities can arrive as
 virtual members with a default, without breaking an engine written outside this repository.
+
+## Writing a schema source
+
+A schema that is not a directory of SQL files comes in through a `SchemaSource`, passed to
+`DbTestHarness.StartAsync(engine, source)` or returned from `DbTestBase.SchemaSource`. Implement
+three members:
+
+- `Key` identifies the schema: sources with equal keys share a container, so it must cover
+  everything that changes what is deployed. It is read before any container starts, so it
+  must not touch the file system or throw.
+- `Validate(engine)` runs before the container starts. Throw `DbTestException` for a
+  configuration mistake, such as a missing file, so it fails in milliseconds.
+- `ApplyAsync(context)` puts the schema into `context.Database` and returns failures in the
+  `SchemaApplyResult` rather than throwing them. `context.ConnectionString` holds the
+  password: keep it out of messages.
+
+`DirectorySchemaSource` (the `schemaRoot` behaviour) and `DacpacSchemaSource` are the two
+built in.
 
 ## Maintainers
 
