@@ -1,19 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>$(DbTestTargetFrameworks)</TargetFrameworks>
     <Description>Engine-agnostic core for database integration test harnesses: container lifecycle, schema application, isolation and diagnostics.</Description>
-    <IsPackable>true</IsPackable>
     <PackageId>DbTest.Core</PackageId>
     <RootNamespace>DbTest.Core</RootNamespace>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Dapper" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
-  </ItemGroup>
 
 </Project>

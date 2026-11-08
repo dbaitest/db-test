@@ -1,0 +1,66 @@
+<Project>
+
+  <!-- Everything under src/ ships to nuget.org. The repository-wide settings come first. -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <TargetFrameworks>$(DbTestTargetFrameworks)</TargetFrameworks>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Product>DbTest</Product>
+    <Authors>dbaitest</Authors>
+    <Company>dbaitest</Company>
+    <Copyright>Copyright (c) dbaitest contributors</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/dbaitest/db-test</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/dbaitest/db-test</PackageProjectUrl>
+    <PackageReleaseNotes>https://github.com/dbaitest/db-test/blob/main/CHANGELOG.md</PackageReleaseNotes>
+    <PackageTags>dotnet;database;testing;integration-tests;testcontainers;sqlserver;postgresql;mysql;mstest</PackageTags>
+    <!-- The README ships inside the package, so nuget.org shows it on the package page. -->
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <!--
+    The version is not edited by hand. A local build is 0.0.0-dev; the Publish workflow
+    passes -p:Version from the release tag, so the tag is the only place a version lives.
+  -->
+  <PropertyGroup>
+    <VersionPrefix>0.0.0</VersionPrefix>
+    <VersionSuffix>dev</VersionSuffix>
+  </PropertyGroup>
+
+  <!--
+    Debuggability. Source Link (built into the .NET 8+ SDK) maps the PDBs to the GitHub
+    sources; the symbols ship as a .snupkg next to each package; a CI build normalises paths
+    so the same commit produces the same binaries anywhere.
+  -->
+  <PropertyGroup>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <!--
+    Package validation checks that every target framework exposes a compatible API surface.
+    Once 0.2.0 is on nuget.org, set PackageValidationBaselineVersion to it so a later release
+    cannot break the public API by accident.
+  -->
+  <PropertyGroup>
+    <EnablePackageValidation>true</EnablePackageValidation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)../README.md" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
+  <!-- The unit tests reach the internals (scalar conversion, CLI argument parsing). -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="DbTest.Core.Tests" />
+  </ItemGroup>
+
+</Project>
