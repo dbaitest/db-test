@@ -47,6 +47,16 @@ public abstract class DbTestBase
     /// </summary>
     protected virtual string? SchemaRoot => null;
 
+    /// <summary>
+    /// The schema source for the engine, or null to use <see cref="SchemaRoot"/>. Use it for a
+    /// schema that is not a directory of SQL files, such as a SQL Server <c>.dacpac</c>. A
+    /// relative path inside a source resolves against the current directory: pass
+    /// <c>Path.Combine(AppContext.BaseDirectory, …)</c> for files copied next to the tests.
+    /// Setting it together with <see cref="SchemaRoot"/> or <see cref="SchemaLoadOptions"/>
+    /// is an error.
+    /// </summary>
+    protected virtual SchemaSource? SchemaSource => null;
+
     /// <summary>Container options, or null for the engine defaults.</summary>
     protected virtual DbContainerOptions? ContainerOptions => null;
 
@@ -67,14 +77,45 @@ public abstract class DbTestBase
     [TestInitialize]
     public async Task InitializeDbTestAsync()
     {
-        Harness = await DbTestRun.GetHarnessAsync(
-            CreateEngine(),
-            SchemaRoot,
-            ContainerOptions,
-            SchemaLoadOptions,
-            TestContext.CancellationToken).ConfigureAwait(false);
+        var schema = ResolveSchema(SchemaSource, SchemaRoot, SchemaLoadOptions);
+
+        Harness = schema is null
+            ? await DbTestRun.GetHarnessAsync(
+                CreateEngine(),
+                SchemaRoot,
+                ContainerOptions,
+                SchemaLoadOptions,
+                TestContext.CancellationToken).ConfigureAwait(false)
+            : await DbTestRun.GetHarnessAsync(
+                CreateEngine(),
+                schema,
+                ContainerOptions,
+                TestContext.CancellationToken).ConfigureAwait(false);
 
         _stopwatch = Stopwatch.StartNew();
+    }
+
+    /// <summary>
+    /// Picks the schema configuration: the source when one is given, otherwise null so the
+    /// directory settings apply. Mixing the two is refused rather than silently ignored.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">A source is combined with directory settings.</exception>
+    internal static SchemaSource? ResolveSchema(SchemaSource? schema, string? schemaRoot, SchemaLoadOptions? loadOptions)
+    {
+        if (schema is null)
+        {
+            return null;
+        }
+
+        if (schemaRoot is not null || loadOptions is not null)
+        {
+            throw new InvalidOperationException(
+                $"{nameof(SchemaSource)} cannot be combined with {nameof(SchemaRoot)} or {nameof(SchemaLoadOptions)}: "
+                + $"a schema source carries its own location and options. Override only {nameof(SchemaSource)}, "
+                + $"or use {nameof(DirectorySchemaSource)} for a directory.");
+        }
+
+        return schema;
     }
 
     /// <summary>Records the test's duration and runs the shape guard against it.</summary>
