@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Deploys a SQL Server .dacpac (an SSDT / Microsoft.Build.Sql database project) into the DbTest container through DacFx.</Description>
+    <PackageId>DbTest.MsSql.Dacpac</PackageId>
+    <RootNamespace>DbTest.MsSql.Dacpac</RootNamespace>
+    <PackageTags>$(PackageTags);dacpac;dacfx;ssdt;sqlproj</PackageTags>
+  </PropertyGroup>
+
+  <!--
+    Package validation compares the API against the baseline release on nuget.org, and this
+    package has no release yet. Remove this property once the first version is published so
+    the baseline check covers it like every other package.
+  -->
+  <PropertyGroup>
+    <DisablePackageBaselineValidation>true</DisablePackageBaselineValidation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SqlServer.DacFx" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DbTest.MsSql\DbTest.MsSql.csproj" />
+  </ItemGroup>
+
+</Project>

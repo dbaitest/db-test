@@ -20,6 +20,7 @@
     <ProjectReference Include="..\..\src\DbTest.Core\DbTest.Core.csproj" />
     <ProjectReference Include="..\..\src\DbTest.Cli\DbTest.Cli.csproj" />
     <ProjectReference Include="..\..\src\DbTest.MSTest\DbTest.MSTest.csproj" />
+    <ProjectReference Include="..\..\src\DbTest.MsSql.Dacpac\DbTest.MsSql.Dacpac.csproj" />
   </ItemGroup>
 
 </Project>

@@ -16,8 +16,10 @@ updates:
         patterns: ["Testcontainers*"]
       mstest:
         patterns: ["MSTest*", "Microsoft.NET.Test.Sdk", "coverlet*"]
+      # DacFx rides with the drivers: it runs on the pinned SqlClient, so they move together and
+      # the dacpac deploy test proves the pair in one pull request.
       drivers:
-        patterns: ["Microsoft.Data.SqlClient", "Npgsql", "MySqlConnector"]
+        patterns: ["Microsoft.Data.SqlClient", "Npgsql", "MySqlConnector", "Microsoft.SqlServer.DacFx"]
 
   - package-ecosystem: github-actions
     directory: /
