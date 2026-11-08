@@ -113,7 +113,7 @@ symbols) to nuget.org.
 
 ```bash
 # The tag is the version: v0.2.0 publishes 0.2.0. No file in the repository holds a version;
-# a local build is 0.0.0-dev.
+# a local build is <last release>-dev (see PackageValidationBaselineVersion).
 gh release create v0.2.0 --notes-file <(sed -n '/^## \[0.2.0\]/,/^## \[/p' CHANGELOG.md | sed '$d')
 ```
 
