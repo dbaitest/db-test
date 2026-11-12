@@ -17,30 +17,30 @@ every database test suite hits and that most teams solve by hand, badly:
 | How does the schema get there? | Schema files on disk, applied in order, with the engine's own splitting rules (`GO` batches, dollar-quoted bodies, `DELIMITER` directives). |
 | A test dropped a table and the next test failed on a missing object | The **shape guard** snapshots every object after the schema is applied and fails the test that changed the shape. |
 | One test's rows leaked into the next | `CleanAsync()` empties every table whatever the foreign keys and resets identity counters to their seed. |
-| "The suite is slow" | Optional per-test timing output (`DBTEST_TIMING=1`). |
+| "The suite is slow" | Optional per-test timing output (`DBAITEST_TIMING=1`). |
 | The same assertions written three times | The engine is behind one abstract class; the test body never mentions one. |
 
 ## 2. Architecture
 
 ```
-src/DbTest.Core          engine-agnostic: the DbEngine base class, schema loading,
-                         statement splitting, the harness, the shape guard, diagnostics
-src/DbTest.MSTest        DbTestBase / DbTestRun: shared harness per engine, shape guard
-                         after every test, timings
-src/DbTest.MsSql         SQL Server engine
-src/DbTest.PostgreSql    PostgreSQL engine
-src/DbTest.MySql         MySQL engine
-src/DbTest.Cli           the `dbtest` command
-tests/DbTest.Core.Tests  unit tests: splitters, scalar conversion, loader, guard,
-                         diagnostics, CLI parsing — no Docker
-tests/DbTest.Integration.Tests
-                         one shared test body, built on DbTest.MSTest, run against all
-                         three engines
+src/DbAiTest.Core          engine-agnostic: the DbEngine base class, schema loading,
+                           statement splitting, the harness, the shape guard, diagnostics
+src/DbAiTest.MSTest        DbAiTestBase / DbAiTestRun: shared harness per engine, shape guard
+                           after every test, timings
+src/DbAiTest.MsSql         SQL Server engine
+src/DbAiTest.PostgreSql    PostgreSQL engine
+src/DbAiTest.MySql         MySQL engine
+src/DbAiTest.Cli           the `dbaitest` command
+tests/DbAiTest.Core.Tests  unit tests: splitters, scalar conversion, loader, guard,
+                           diagnostics, CLI parsing — no Docker
+tests/DbAiTest.Integration.Tests
+                           one shared test body, built on DbAiTest.MSTest, run against all
+                           three engines
 ```
 
 ### The engine contract
 
-`DbEngine` (in `DbTest.Core`) is an abstract class. An engine implements only what is
+`DbEngine` (in `DbAiTest.Core`) is an abstract class. An engine implements only what is
 genuinely engine-specific:
 
 - its name and default image, and a connection factory;
@@ -72,10 +72,10 @@ almost everything, and each disagreement used to be a special case in test code:
 `SchemaShapeGuard` is the piece worth porting from the internal PMI harness. A shared
 container means a shared schema; a test that drops or re-types a table leaves the next test
 failing for the wrong reason. The guard snapshots every object after the schema is applied;
-`DbTestBase` re-reads it after every test and fails the test that changed one:
+`DbAiTestBase` re-reads it after every test and fails the test that changed one:
 
 ```
-[ShapeGuard] CustomerTests.Adds_A_Column left public.customers columns changed (id,email,...) -> (id,email,...,dbtest_shape_probe)
+[ShapeGuard] CustomerTests.Adds_A_Column left public.customers columns changed (id,email,...) -> (id,email,...,dbaitest_shape_probe)
 ```
 
 Each damaged object is blamed once, on the first test that saw it damaged; an object put
@@ -86,18 +86,18 @@ and the next run is exactly when you want to see it.
 
 ## 3. What was built and verified
 
-- `DbTest.Core` — the `DbEngine` base class, schema loader, statement splitters (`GO`
+- `DbAiTest.Core` — the `DbEngine` base class, schema loader, statement splitters (`GO`
   batches, `DELIMITER`), scalar conversion, harness, shape guard, timing diagnostics, engine
   registry.
-- `DbTest.MSTest` — `DbTestBase` and `DbTestRun`.
-- `DbTest.MsSql`, `DbTest.PostgreSql`, `DbTest.MySql` — one engine each.
-- `DbTest.Cli` — `dbtest engines`, `dbtest up`, `dbtest schema`.
+- `DbAiTest.MSTest` — `DbAiTestBase` and `DbAiTestRun`.
+- `DbAiTest.MsSql`, `DbAiTest.PostgreSql`, `DbAiTest.MySql` — one engine each.
+- `DbAiTest.Cli` — `dbaitest engines`, `dbaitest up`, `dbaitest schema`.
 - Unit tests — splitters, scalar conversion, loader ordering and exclusion, shape guard,
   diagnostics, CLI parsing, registry.
 - Integration tests — one shared test body asserting container startup, schema application,
   seeding, cleanup with identity reset (including a table that never held a row), nullable
   and cross-driver scalar conversion, foreign-key enforcement, and shape-guard detection,
-  executed against all three engines through `DbTest.MSTest`.
+  executed against all three engines through `DbAiTest.MSTest`.
 
 **Verification (0.2.0): 154/154 tests pass in Release from a clean tree**, on Windows with
 Docker Desktop 29.7.2 and .NET SDK 10.0.301: 53 unit tests and 24 integration tests (8
@@ -108,7 +108,7 @@ a test that leaves a column added fails in its own cleanup while the next test p
 ### Supported runtimes
 
 The packages target `net8.0` (the floor) and `net10.0` (the primary target); both are LTS.
-`DbTestTargetFrameworks` in `Directory.Build.props` holds that list, and every project — the
+`DbAiTestTargetFrameworks` in `Directory.Build.props` holds that list, and every project — the
 libraries, the CLI and the suites — targets all of it. A consumer on .NET 8 or 9 resolves the
 `net8.0` asset; a consumer on .NET 10 or later resolves the `net10.0` one. The `net9.0`
 target was dropped in 0.2.0: .NET 9 is an STS release, and its consumers lose nothing by
@@ -175,7 +175,7 @@ engine-independent and can be built now; it is the natural next piece.
 The internal tool answers "who calls this stored procedure" from three sources: the schema
 graph, a text scan for dynamic SQL, and a scan of the C# that executes SQL by name. The
 first is engine-specific (see 4.1); the second and third are not, and could ship first as a
-standalone `dbtest trace-callers` command over a directory of `.sql` files.
+standalone `dbaitest trace-callers` command over a directory of `.sql` files.
 
 ### 4.4 Mutate-and-verify automation
 

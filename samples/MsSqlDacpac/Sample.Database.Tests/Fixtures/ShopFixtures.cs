@@ -4,8 +4,8 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-using DbTest.Core;
-using DbTest.Core.Engine;
+using DbAiTest.Core;
+using DbAiTest.Core.Engine;
 
 namespace Sample.Database.Tests.Fixtures;
 
@@ -22,7 +22,7 @@ public static partial class ShopFixtures
     /// Runs a SQL fixture script, such as <c>customers-with-orders.sql</c>, as one batch: no
     /// <c>GO</c> separators.
     /// </summary>
-    public static async Task LoadSqlAsync(DbTestHarness harness, string fileName, CancellationToken cancellationToken)
+    public static async Task LoadSqlAsync(DbAiTestHarness harness, string fileName, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(harness);
 
@@ -37,7 +37,7 @@ public static partial class ShopFixtures
     /// past it. Computed columns are not data: leave them out. A top-level <c>_provenance</c>
     /// object says where the data came from and is not loaded.
     /// </summary>
-    public static async Task LoadJsonAsync(DbTestHarness harness, string fileName, CancellationToken cancellationToken)
+    public static async Task LoadJsonAsync(DbAiTestHarness harness, string fileName, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(harness);
 

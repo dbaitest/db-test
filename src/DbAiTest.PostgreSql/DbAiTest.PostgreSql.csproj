@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>PostgreSQL engine for DbAiTest: container lifecycle, dollar-quote-safe schema application and Postgres introspection.</Description>
+    <PackageId>DbAiTest.PostgreSql</PackageId>
+    <RootNamespace>DbAiTest.PostgreSql</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DbAiTest.Core\DbAiTest.Core.csproj" />
+  </ItemGroup>
+
+</Project>

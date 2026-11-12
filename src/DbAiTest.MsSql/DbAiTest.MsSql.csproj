@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>SQL Server engine for DbAiTest: container lifecycle, GO-batch schema application and SQL Server introspection.</Description>
+    <PackageId>DbAiTest.MsSql</PackageId>
+    <RootNamespace>DbAiTest.MsSql</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="Testcontainers.MsSql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DbAiTest.Core\DbAiTest.Core.csproj" />
+  </ItemGroup>
+
+</Project>

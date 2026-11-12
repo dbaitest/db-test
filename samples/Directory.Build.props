@@ -3,7 +3,7 @@
   <!--
     Samples build against the repository's own projects (ProjectReference), so they compile and
     run against the code in this commit. They are never packed or published: every sample
-    project also says IsPackable=false itself, and samples/ is not part of DbTest.sln, which is
+    project also says IsPackable=false itself, and samples/ is not part of DbAiTest.sln, which is
     what the release workflow builds and packs.
   -->
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />

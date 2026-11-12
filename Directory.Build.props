@@ -48,7 +48,7 @@
     in the README requirements, and a build that needs an SDK new enough to target it.
   -->
   <PropertyGroup>
-    <DbTestTargetFrameworks>net8.0;net10.0</DbTestTargetFrameworks>
+    <DbAiTestTargetFrameworks>net8.0;net10.0</DbAiTestTargetFrameworks>
   </PropertyGroup>
 
   <!--

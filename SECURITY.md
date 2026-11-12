@@ -17,8 +17,8 @@ published with credit to the reporter, unless you ask not to be named.
 
 ## Scope
 
-DbTest is a test harness: it starts throwaway containers with default credentials and is
-not meant to run against a production database. A report is in scope when DbTest itself —
+DbAiTest is a test harness: it starts throwaway containers with default credentials and is
+not meant to run against a production database. A report is in scope when DbAiTest itself —
 or a dependency it ships — lets an attacker do something the test author did not intend,
 for example execute code through a crafted schema file name or leak data from the host.
 Weak default container passwords are by design and out of scope.
@@ -31,4 +31,4 @@ One gap: the `Microsoft.Build.Sql` MSBuild SDK, which builds the database projec
 NuGet's audit does not see an SDK's contents, so an advisory against those copies does not
 fail CI. The SDK only runs at build time, only for the sample (the release workflow never
 builds it), and its version is pinned in `global.json` under `msbuild-sdks`. The DacFx that
-`DbTest.MsSql.Dacpac` ships with is an ordinary package reference and is audited.
+`DbAiTest.MsSql.Dacpac` ships with is an ordinary package reference and is audited.

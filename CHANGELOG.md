@@ -1,11 +1,32 @@
 # Changelog
 
-All notable changes to the DbTest packages are recorded here. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the packages follow
-[Semantic Versioning](https://semver.org/) — while the major version is 0, a minor release
-may break the API, and the breaking changes are listed first.
+All notable changes to the DbAiTest packages (named DbTest up to 0.3.0) are recorded here.
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the packages
+follow [Semantic Versioning](https://semver.org/) — while the major version is 0, a minor
+release may break the API, and the breaking changes are listed first.
 
 ## [Unreleased]
+
+## [0.4.0] - 2026-11-12
+
+### Breaking
+
+- **The packages are renamed from `DbTest.*` to `DbAiTest.*`.** `DbTest` is a common prefix
+  already used by unrelated packages on nuget.org; `DbAiTest` matches the project's
+  organization and can be reserved. The `DbTest.*` packages get no further versions.
+
+  | Was | Now |
+  |---|---|
+  | `DbTest.Core`, `.MsSql`, `.MsSql.Dacpac`, `.PostgreSql`, `.MySql`, `.MSTest`, `.Cli` (package ids and namespaces) | `DbAiTest.Core`, `.MsSql`, `.MsSql.Dacpac`, `.PostgreSql`, `.MySql`, `.MSTest`, `.Cli` |
+  | `DbTestHarness`, `DbTestBase`, `DbTestRun`, `DbTestException` | `DbAiTestHarness`, `DbAiTestBase`, `DbAiTestRun`, `DbAiTestException` |
+  | `DbTestBase.InitializeDbTestAsync()`, `CleanupDbTestAsync()` | `InitializeDbAiTestAsync()`, `CleanupDbAiTestAsync()` |
+  | `dbtest` command (`DbTest.Cli` tool) | `dbaitest` command (`DbAiTest.Cli` tool) |
+  | `DBTEST_TIMING`, `DBTEST_TIMING_FILE`, `dbtest-timing.tsv` | `DBAITEST_TIMING`, `DBAITEST_TIMING_FILE`, `dbaitest-timing.tsv` |
+  | Default database name, and the PostgreSQL and MySQL login, `dbtest` | `dbaitest` |
+
+  To migrate: swap the package references, replace `DbTest` with `DbAiTest` in `using`
+  directives and type names, and rename the environment variables. The old variables are not
+  read any more.
 
 ### Added
 
@@ -132,7 +153,8 @@ may break the API, and the breaking changes are listed first.
 First release: `DbTest.Core`, the SQL Server, PostgreSQL and MySQL engines, and the `dbtest`
 CLI.
 
-[Unreleased]: https://github.com/dbaitest/db-test/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/dbaitest/db-test/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/dbaitest/db-test/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/dbaitest/db-test/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/dbaitest/db-test/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/dbaitest/db-test/releases/tag/v0.1.0
