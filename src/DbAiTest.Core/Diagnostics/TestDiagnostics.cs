@@ -56,7 +56,7 @@ public sealed class TestDiagnostics : IDisposable
         var path = Environment.GetEnvironmentVariable(PathVariable);
         if (string.IsNullOrWhiteSpace(path))
         {
-            path = Path.Combine(defaultDirectory, "dbaitest-timing.tsv");
+            path = Path.Join(defaultDirectory, "dbaitest-timing.tsv");
         }
 
         return new TestDiagnostics(path);
