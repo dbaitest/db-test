@@ -63,7 +63,7 @@ jobs:
       # The tag was cut from a main that passed CI; the unit tests are the last cheap check
       # that what is about to be packed is what was tested.
       - name: Unit tests
-        run: dotnet test tests/DbTest.Core.Tests --configuration Release --no-build
+        run: dotnet test tests/DbAiTest.Core.Tests --configuration Release --no-build
 
       - name: Pack
         run: dotnet pack --configuration Release --no-build --output artifacts -p:Version="$VERSION"
@@ -109,7 +109,7 @@ jobs:
       # --skip-duplicate lets a re-run finish a publish that failed half way.
       - name: Push to nuget.org
         run: >-
-          dotnet nuget push "artifacts/DbTest.*.nupkg"
+          dotnet nuget push "artifacts/DbAiTest.*.nupkg"
           --source https://api.nuget.org/v3/index.json
           --api-key "$NUGET_API_KEY"
           --skip-duplicate

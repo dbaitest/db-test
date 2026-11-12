@@ -12,7 +12,7 @@ dir="${1:-artifacts}"
 
 expected=$(for project in src/*/*.csproj; do basename "$project" .csproj; done | sort)
 
-# DbTest.MsSql.Dacpac.0.3.0-dev.nupkg -> DbTest.MsSql.Dacpac (the id ends where the version starts).
+# DbAiTest.MsSql.Dacpac.0.3.0-dev.nupkg -> DbAiTest.MsSql.Dacpac (the id ends where the version starts).
 actual=$(for package in "$dir"/*.nupkg; do
   basename "$package" .nupkg | sed -E 's/\.[0-9]+\.[0-9]+\.[0-9]+([-+].*)?$//'
 done | sort)

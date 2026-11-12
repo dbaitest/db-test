@@ -1,8 +1,8 @@
-using DbTest.Core.Engine;
-using DbTest.Core.Schema;
-using DbTest.MsSql;
-using DbTest.MsSql.Dacpac;
-using DbTest.MSTest;
+using DbAiTest.Core.Engine;
+using DbAiTest.Core.Schema;
+using DbAiTest.MsSql;
+using DbAiTest.MsSql.Dacpac;
+using DbAiTest.MSTest;
 
 using Microsoft.Data.SqlClient;
 
@@ -13,7 +13,7 @@ namespace Sample.Database.Tests;
 /// throwaway SQL Server container.
 /// </summary>
 [TestClass]
-public sealed class ShopTests : DbTestBase
+public sealed class ShopTests : DbAiTestBase
 {
     protected override DbEngine CreateEngine() => new MsSqlEngine();
 

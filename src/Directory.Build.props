@@ -4,12 +4,12 @@
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
 
   <PropertyGroup>
-    <TargetFrameworks>$(DbTestTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DbAiTestTargetFrameworks)</TargetFrameworks>
     <IsPackable>true</IsPackable>
   </PropertyGroup>
 
   <PropertyGroup>
-    <Product>DbTest</Product>
+    <Product>DbAiTest</Product>
     <Authors>dbaitest</Authors>
     <Company>dbaitest</Company>
     <Copyright>Copyright (c) dbaitest contributors</Copyright>
@@ -31,10 +31,14 @@
     A local or CI build is <baseline>-dev. Its assembly version then equals the baseline's,
     which package validation requires (CP0003: an assembly version may not go below the
     baseline's), and nothing but the baseline holds a version number.
+
+    The DbAiTest.* ids have no release yet (0.3.0 and earlier shipped as DbTest.*), so there
+    is no baseline to restore from nuget.org: VersionPrefix names the first DbAiTest release
+    directly. After that release, put PackageValidationBaselineVersion back, set to it, and
+    derive VersionPrefix from it again.
   -->
   <PropertyGroup>
-    <PackageValidationBaselineVersion>0.3.0</PackageValidationBaselineVersion>
-    <VersionPrefix>$(PackageValidationBaselineVersion)</VersionPrefix>
+    <VersionPrefix>0.4.0</VersionPrefix>
     <VersionSuffix>dev</VersionSuffix>
   </PropertyGroup>
 
@@ -67,7 +71,7 @@
 
   <!-- The unit tests reach the internals (scalar conversion, CLI argument parsing). -->
   <ItemGroup>
-    <InternalsVisibleTo Include="DbTest.Core.Tests" />
+    <InternalsVisibleTo Include="DbAiTest.Core.Tests" />
   </ItemGroup>
 
 </Project>

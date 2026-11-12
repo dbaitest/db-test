@@ -26,8 +26,8 @@ git config core.hooksPath .githooks
 
 ```bash
 dotnet build                                                     # warnings are errors
-dotnet test tests/DbTest.Core.Tests                              # unit tests, no Docker
-dotnet test tests/DbTest.Integration.Tests -f net10.0            # all three engines, one runtime
+dotnet test tests/DbAiTest.Core.Tests                              # unit tests, no Docker
+dotnet test tests/DbAiTest.Integration.Tests -f net10.0            # all three engines, one runtime
 ```
 
 Docker must be running for the integration tests: they start real database containers.
@@ -156,6 +156,10 @@ it. After each release, raise it to the new version; a deliberate breaking chang
 in the same pull request. A package published for the first time has no baseline yet, so
 release it once before its ID is validated.
 
+The packages were renamed from `DbTest.*` to `DbAiTest.*` after 0.3.0, so no `DbAiTest.*` id
+has a baseline until the first `DbAiTest` release: until then the property is absent and
+`VersionPrefix` names that release. After it ships, restore the baseline as described above.
+
 ## Ground rules
 
 **The engine base class is the abstraction boundary.** If a test needs to know which engine it
@@ -176,9 +180,9 @@ caller can log or fail on it.
 
 ## Adding an engine
 
-1. Add `src/DbTest.<Name>` with a class deriving from `DbEngine`.
+1. Add `src/DbAiTest.<Name>` with a class deriving from `DbEngine`.
 2. Add the engine to `EngineRegistration.RegisterBuiltins()` in the CLI.
-3. Add a schema under `tests/DbTest.Integration.Tests/Schema/<name>/`, including the
+3. Add a schema under `tests/DbAiTest.Integration.Tests/Schema/<name>/`, including the
    `customers`, `orders` and `audit_entries` tables and the `customer_order_total` routine.
 4. Add a `[TestClass]` deriving from `HarnessBehaviourTestsBase` that overrides
    `CreateEngine`, `SchemaDirectory` and the two probe-column statements.
@@ -191,7 +195,7 @@ the engine's own test class, and the shared assertion stays shared.
 ## Dependencies
 
 - Supported runtimes: `net8.0` (the floor) and `net10.0`. .NET 9 consumers resolve the
-  `net8.0` asset. The list lives in `DbTestTargetFrameworks` in `Directory.Build.props`;
+  `net8.0` asset. The list lives in `DbAiTestTargetFrameworks` in `Directory.Build.props`;
   every project targets all of it, so a change to that list changes what CI builds and runs.
 - Building the repository needs the .NET 10 SDK — `global.json` pins it, because targeting
   `net10.0` needs an SDK that new. Consuming the packages needs only .NET 8 or newer.

@@ -1,8 +1,8 @@
-using DbTest.Core.Engine;
-using DbTest.Core.Schema;
-using DbTest.MsSql;
-using DbTest.MsSql.Dacpac;
-using DbTest.MSTest;
+using DbAiTest.Core.Engine;
+using DbAiTest.Core.Schema;
+using DbAiTest.MsSql;
+using DbAiTest.MsSql.Dacpac;
+using DbAiTest.MSTest;
 
 using Sample.Shop;
 
@@ -13,7 +13,7 @@ namespace Sample.Database.Tests;
 /// deployed Sample.Database. It is the same setup as <see cref="ShopTests"/>, which keeps its own
 /// copy so it stays readable on its own, plus <see cref="Connections"/>.
 /// </summary>
-public abstract class ShopDatabaseTest : DbTestBase
+public abstract class ShopDatabaseTest : DbAiTestBase
 {
     protected override DbEngine CreateEngine() => new MsSqlEngine();
 
@@ -30,7 +30,7 @@ public abstract class ShopDatabaseTest : DbTestBase
     /// <summary>
     /// Starts every test from the deployed state: CleanAsync empties every table, including the
     /// tax rates the post-deployment script seeded, so the script runs again. MSTest runs this
-    /// after <see cref="DbTestBase"/>'s own initialization, which creates the harness.
+    /// after <see cref="DbAiTestBase"/>'s own initialization, which creates the harness.
     /// </summary>
     [TestInitialize]
     public async Task ResetAsync()

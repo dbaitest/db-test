@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Unit tests: no container, no Docker. They run on every OS in CI and fail fast when the
+    splitting, conversion, loading or guarding rules regress.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>$(DbAiTestTargetFrameworks)</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>DbAiTest.Core.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="MSTest" />
+    <PackageReference Include="coverlet.collector" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DbAiTest.Core\DbAiTest.Core.csproj" />
+    <ProjectReference Include="..\..\src\DbAiTest.Cli\DbAiTest.Cli.csproj" />
+    <ProjectReference Include="..\..\src\DbAiTest.MSTest\DbAiTest.MSTest.csproj" />
+    <ProjectReference Include="..\..\src\DbAiTest.MsSql.Dacpac\DbAiTest.MsSql.Dacpac.csproj" />
+  </ItemGroup>
+
+</Project>

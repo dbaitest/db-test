@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Engine-agnostic core for database integration test harnesses: container lifecycle, schema application, isolation and diagnostics.</Description>
+    <PackageId>DbAiTest.Core</PackageId>
+    <RootNamespace>DbAiTest.Core</RootNamespace>
+  </PropertyGroup>
+
+</Project>

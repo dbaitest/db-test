@@ -2,7 +2,7 @@
 
   <ItemGroup>
     <!--
-      Test framework. DbTest.MSTest ships against MSTest.TestFramework only. MSTest (which
+      Test framework. DbAiTest.MSTest ships against MSTest.TestFramework only. MSTest (which
       brings MSTest.TestAdapter) and MSTest.TestFramework must carry the SAME version: the
       adapter refuses to load next to a different framework version, and `dotnet test` then
       reports "No test is available" and still exits 0, so a mismatch silently runs no tests.
@@ -25,7 +25,7 @@
     <PackageVersion Include="MySqlConnector" Version="2.6.2" />
 
     <!--
-      DacFx, used only by DbTest.MsSql.Dacpac. It declares Microsoft.Data.SqlClient 6.x;
+      DacFx, used only by DbAiTest.MsSql.Dacpac. It declares Microsoft.Data.SqlClient 6.x;
       transitive pinning lifts that to the 7.x above, a major version DacFx was not built
       against. DacpacMsSqlHarnessTests deploys a real dacpac on net8.0 and net10.0, which is
       the proof the pair works at runtime: re-run it whenever either version moves.

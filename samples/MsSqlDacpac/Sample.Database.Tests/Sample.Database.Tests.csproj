@@ -13,15 +13,15 @@
 
   <!--
     In your own project these are package references instead:
-      dotnet add package DbTest.MSTest
-      dotnet add package DbTest.MsSql.Dacpac
+      dotnet add package DbAiTest.MSTest
+      dotnet add package DbAiTest.MsSql.Dacpac
   -->
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\DbTest.MSTest\DbTest.MSTest.csproj" />
-    <ProjectReference Include="..\..\..\src\DbTest.MsSql.Dacpac\DbTest.MsSql.Dacpac.csproj" />
+    <ProjectReference Include="..\..\..\src\DbAiTest.MSTest\DbAiTest.MSTest.csproj" />
+    <ProjectReference Include="..\..\..\src\DbAiTest.MsSql.Dacpac\DbAiTest.MsSql.Dacpac.csproj" />
   </ItemGroup>
 
-  <!-- The application code under test: repositories that know nothing about DbTest. -->
+  <!-- The application code under test: repositories that know nothing about DbAiTest. -->
   <ItemGroup>
     <ProjectReference Include="..\Sample.Shop\Sample.Shop.csproj" />
   </ItemGroup>

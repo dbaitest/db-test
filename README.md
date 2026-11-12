@@ -1,7 +1,7 @@
 # db-test
 
 [![Build](https://github.com/dbaitest/db-test/actions/workflows/ci.yml/badge.svg)](https://github.com/dbaitest/db-test/actions/workflows/ci.yml)
-[![NuGet](https://img.shields.io/nuget/v/DbTest.Core.svg)](https://www.nuget.org/packages/DbTest.Core)
+[![NuGet](https://img.shields.io/nuget/v/DbAiTest.Core.svg)](https://www.nuget.org/packages/DbAiTest.Core)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-dbaitest.com-0b7285.svg)](https://dbaitest.com/db-test/)
 
@@ -14,14 +14,14 @@ Every run gets a throwaway database container. Nothing touches a shared, staging
 production database.
 
 ```csharp
-using DbTest.Core.Engine;
-using DbTest.MsSql;
-using DbTest.MSTest;
-using DbTest.MySql;
-using DbTest.PostgreSql;
+using DbAiTest.Core.Engine;
+using DbAiTest.MsSql;
+using DbAiTest.MSTest;
+using DbAiTest.MySql;
+using DbAiTest.PostgreSql;
 
 // The tests, written once. No engine name appears in them.
-public abstract class CustomerTests : DbTestBase
+public abstract class CustomerTests : DbAiTestBase
 {
     [TestMethod]
     public async Task Inserted_Customer_Should_Be_Counted()
@@ -71,7 +71,7 @@ public sealed class MySqlCustomerTests : CustomerTests
 public static class TestRun
 {
     [AssemblyCleanup]
-    public static Task Cleanup() => DbTestRun.DisposeAllAsync();
+    public static Task Cleanup() => DbAiTestRun.DisposeAllAsync();
 }
 ```
 
@@ -86,23 +86,23 @@ by hand:
 | How does the schema get there? | Schema files on disk, applied in order, with each engine's own splitting rules. |
 | A test dropped a column and the next test failed on it | The **shape guard** fails the test that did it, naming the object and the change. |
 | One test's rows leaked into the next | `CleanAsync()` empties every table whatever the foreign keys, and resets identity counters. |
-| "The suite is slow" | Per-test timings in a TSV file (`DBTEST_TIMING=1`). |
+| "The suite is slow" | Per-test timings in a TSV file (`DBAITEST_TIMING=1`). |
 | The same assertions written three times | The engine sits behind one abstract class. |
 
 ## Install
 
 ```bash
-dotnet add package DbTest.MSTest        # base class for MSTest (brings DbTest.Core)
-dotnet add package DbTest.MsSql         # SQL Server engine
-dotnet add package DbTest.PostgreSql    # PostgreSQL engine
-dotnet add package DbTest.MySql         # MySQL engine
-dotnet add package DbTest.MsSql.Dacpac  # deploy a .dacpac (SQL Server database projects)
+dotnet add package DbAiTest.MSTest        # base class for MSTest (brings DbAiTest.Core)
+dotnet add package DbAiTest.MsSql         # SQL Server engine
+dotnet add package DbAiTest.PostgreSql    # PostgreSQL engine
+dotnet add package DbAiTest.MySql         # MySQL engine
+dotnet add package DbAiTest.MsSql.Dacpac  # deploy a .dacpac (SQL Server database projects)
 ```
 
-`DbTest.Core` alone gives the harness without any test framework. The CLI:
+`DbAiTest.Core` alone gives the harness without any test framework. The CLI:
 
 ```bash
-dotnet tool install --global DbTest.Cli
+dotnet tool install --global DbAiTest.Cli
 ```
 
 ## Requirements
@@ -119,7 +119,7 @@ Point the harness at a directory of SQL files — through `SchemaRoot` in the ba
 directly:
 
 ```csharp
-await using var harness = await DbTestHarness.StartAsync(
+await using var harness = await DbAiTestHarness.StartAsync(
     new PostgreSqlEngine(),
     schemaRoot: "Schema/postgres");
 ```
@@ -171,18 +171,18 @@ A SQL Server database project (SSDT, or the SDK-style `Microsoft.Build.Sql`) kee
 per file, and the objects depend on each other across folders in both directions: a table in
 `dbo/Tables` has a computed column calling a function in `dbo/Functions`, which reads another
 table in `dbo/Tables`. No file order — not even `OrderedDirectories` — applies that. The
-project builds into a `.dacpac`, and `DbTest.MsSql.Dacpac` deploys the dacpac with DacFx, in
+project builds into a `.dacpac`, and `DbAiTest.MsSql.Dacpac` deploys the dacpac with DacFx, in
 dependency order:
 
 ```csharp
-using DbTest.Core.Engine;
-using DbTest.Core.Schema;
-using DbTest.MsSql;
-using DbTest.MsSql.Dacpac;
-using DbTest.MSTest;
+using DbAiTest.Core.Engine;
+using DbAiTest.Core.Schema;
+using DbAiTest.MsSql;
+using DbAiTest.MsSql.Dacpac;
+using DbAiTest.MSTest;
 
 [TestClass]
-public sealed class ShopTests : DbTestBase
+public sealed class ShopTests : DbAiTestBase
 {
     protected override DbEngine CreateEngine() => new MsSqlEngine();
 
@@ -264,7 +264,7 @@ A shared container means a shared schema. A test that drops or re-types a table 
 next test failing for the wrong reason — and the failure points at the victim, not the
 culprit.
 
-The guard snapshots every table, view and routine after the schema is applied. `DbTestBase`
+The guard snapshots every table, view and routine after the schema is applied. `DbAiTestBase`
 re-reads them after every test and fails the test that changed one:
 
 ```
@@ -314,38 +314,38 @@ await using var connection = await harness.OpenConnectionAsync();
 ## Diagnostics
 
 ```bash
-DBTEST_TIMING=1 dotnet test
+DBAITEST_TIMING=1 dotnet test
 ```
 
-With `DbTest.MSTest`, writes one row per test to `dbtest-timing.tsv` next to the test
-binaries (or to `DBTEST_TIMING_FILE`). Off by default; no file is written unless it is
+With `DbAiTest.MSTest`, writes one row per test to `dbaitest-timing.tsv` next to the test
+binaries (or to `DBAITEST_TIMING_FILE`). Off by default; no file is written unless it is
 switched on.
 
 ## The CLI
 
 ```bash
-dbtest engines                                         # list the registered engines
-dbtest up --engine postgres --schema Schema/postgres   # start, apply, keep running until Ctrl+C
-dbtest schema --engine mysql --schema Schema/mysql     # apply a schema and list what it created
+dbaitest engines                                         # list the registered engines
+dbaitest up --engine postgres --schema Schema/postgres   # start, apply, keep running until Ctrl+C
+dbaitest schema --engine mysql --schema Schema/mysql     # apply a schema and list what it created
 ```
 
 ## Layout
 
 ```
-src/DbTest.Core          engine-agnostic: the DbEngine base class, schema loading, statement
-                         splitting, the harness, the shape guard, diagnostics
-src/DbTest.MSTest        DbTestBase and DbTestRun for MSTest
-src/DbTest.MsSql         SQL Server engine
-src/DbTest.MsSql.Dacpac  deploys a SQL Server .dacpac through DacFx (the only DacFx dependency)
-src/DbTest.PostgreSql    PostgreSQL engine
-src/DbTest.MySql         MySQL engine
-src/DbTest.Cli           the `dbtest` command
-tests/DbTest.Core.Tests  unit tests, no Docker
-tests/DbTest.Integration.Tests
-                         one shared test body, run against all three engines, plus a
-                         dacpac deploy on SQL Server
-samples/MsSqlDacpac      a SQL Server database project, a data-access library (ADO.NET and
-                         Dapper repositories) and their tests (own solution)
+src/DbAiTest.Core          engine-agnostic: the DbEngine base class, schema loading, statement
+                           splitting, the harness, the shape guard, diagnostics
+src/DbAiTest.MSTest        DbAiTestBase and DbAiTestRun for MSTest
+src/DbAiTest.MsSql         SQL Server engine
+src/DbAiTest.MsSql.Dacpac  deploys a SQL Server .dacpac through DacFx (the only DacFx dependency)
+src/DbAiTest.PostgreSql    PostgreSQL engine
+src/DbAiTest.MySql         MySQL engine
+src/DbAiTest.Cli           the `dbaitest` command
+tests/DbAiTest.Core.Tests  unit tests, no Docker
+tests/DbAiTest.Integration.Tests
+                           one shared test body, run against all three engines, plus a
+                           dacpac deploy on SQL Server
+samples/MsSqlDacpac        a SQL Server database project, a data-access library (ADO.NET and
+                           Dapper repositories) and their tests (own solution)
 ```
 
 ## Writing an engine
@@ -361,13 +361,13 @@ virtual members with a default, without breaking an engine written outside this 
 ## Writing a schema source
 
 A schema that is not a directory of SQL files comes in through a `SchemaSource`, passed to
-`DbTestHarness.StartAsync(engine, source)` or returned from `DbTestBase.SchemaSource`. Implement
+`DbAiTestHarness.StartAsync(engine, source)` or returned from `DbAiTestBase.SchemaSource`. Implement
 three members:
 
 - `Key` identifies the schema: sources with equal keys share a container, so it must cover
   everything that changes what is deployed. It is read before any container starts, so it
   must not touch the file system or throw.
-- `Validate(engine)` runs before the container starts. Throw `DbTestException` for a
+- `Validate(engine)` runs before the container starts. Throw `DbAiTestException` for a
   configuration mistake, such as a missing file, so it fails in milliseconds.
 - `ApplyAsync(context)` puts the schema into `context.Database` and returns failures in the
   `SchemaApplyResult` rather than throwing them. `context.ConnectionString` holds the

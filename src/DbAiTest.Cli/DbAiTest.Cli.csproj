@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <Description>Command line front end for DbAiTest: start a container, apply a schema, report on it.</Description>
+    <PackageId>DbAiTest.Cli</PackageId>
+    <RootNamespace>DbAiTest.Cli</RootNamespace>
+    <AssemblyName>dbaitest</AssemblyName>
+    <ToolCommandName>dbaitest</ToolCommandName>
+    <PackAsTool>true</PackAsTool>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DbAiTest.Core\DbAiTest.Core.csproj" />
+    <ProjectReference Include="..\DbAiTest.MsSql\DbAiTest.MsSql.csproj" />
+    <ProjectReference Include="..\DbAiTest.MySql\DbAiTest.MySql.csproj" />
+    <ProjectReference Include="..\DbAiTest.PostgreSql\DbAiTest.PostgreSql.csproj" />
+  </ItemGroup>
+
+</Project>
