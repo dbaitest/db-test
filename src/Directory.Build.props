@@ -31,14 +31,10 @@
     A local or CI build is <baseline>-dev. Its assembly version then equals the baseline's,
     which package validation requires (CP0003: an assembly version may not go below the
     baseline's), and nothing but the baseline holds a version number.
-
-    The DbAiTest.* ids have no release yet (0.3.0 and earlier shipped as DbTest.*), so there
-    is no baseline to restore from nuget.org: VersionPrefix names the first DbAiTest release
-    directly. After that release, put PackageValidationBaselineVersion back, set to it, and
-    derive VersionPrefix from it again.
   -->
   <PropertyGroup>
-    <VersionPrefix>0.4.0</VersionPrefix>
+    <PackageValidationBaselineVersion>0.4.0</PackageValidationBaselineVersion>
+    <VersionPrefix>$(PackageValidationBaselineVersion)</VersionPrefix>
     <VersionSuffix>dev</VersionSuffix>
   </PropertyGroup>
 
