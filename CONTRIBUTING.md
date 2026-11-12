@@ -156,10 +156,6 @@ it. After each release, raise it to the new version; a deliberate breaking chang
 in the same pull request. A package published for the first time has no baseline yet, so
 release it once before its ID is validated.
 
-The packages were renamed from `DbTest.*` to `DbAiTest.*` after 0.3.0, so no `DbAiTest.*` id
-has a baseline until the first `DbAiTest` release: until then the property is absent and
-`VersionPrefix` names that release. After it ships, restore the baseline as described above.
-
 ## Ground rules
 
 **The engine base class is the abstraction boundary.** If a test needs to know which engine it
