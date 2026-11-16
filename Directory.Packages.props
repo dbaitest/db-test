@@ -7,9 +7,9 @@
       adapter refuses to load next to a different framework version, and `dotnet test` then
       reports "No test is available" and still exits 0, so a mismatch silently runs no tests.
     -->
-    <PackageVersion Include="MSTest" Version="4.5.2" />
-    <PackageVersion Include="MSTest.TestFramework" Version="4.5.2" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+    <PackageVersion Include="MSTest" Version="4.5.3" />
+    <PackageVersion Include="MSTest.TestFramework" Version="4.5.3" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
     <PackageVersion Include="coverlet.collector" Version="10.1.0" />
 
     <!-- Containers. 4.16.0 or later: it brings SSH.NET 2026.0.0 (GHSA-mggc-4xg6-vcxf, GHSA-q939-rpr3-3284). -->
