@@ -13,9 +13,9 @@
     <PackageVersion Include="coverlet.collector" Version="10.1.0" />
 
     <!-- Containers. 4.16.0 or later: it brings SSH.NET 2026.0.0 (GHSA-mggc-4xg6-vcxf, GHSA-q939-rpr3-3284). -->
-    <PackageVersion Include="Testcontainers.MsSql" Version="4.16.0" />
-    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.16.0" />
-    <PackageVersion Include="Testcontainers.MySql" Version="4.16.0" />
+    <PackageVersion Include="Testcontainers.MsSql" Version="4.17.0" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.17.0" />
+    <PackageVersion Include="Testcontainers.MySql" Version="4.17.0" />
 
     <!-- ADO.NET drivers -->
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.1.2" />
