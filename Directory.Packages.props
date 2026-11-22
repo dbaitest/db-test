@@ -20,7 +20,7 @@
     <!-- ADO.NET drivers -->
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.1.2" />
     <!-- Npgsql 10 ships net8.0 and net10.0 assets, so one version serves both targets. -->
-    <PackageVersion Include="Npgsql" Version="10.0.3" />
+    <PackageVersion Include="Npgsql" Version="10.0.4" />
     <!-- 2.6.1 or later: GHSA-473q-m89c-ghf8. -->
     <PackageVersion Include="MySqlConnector" Version="3.0.0" />
 
